@@ -1,0 +1,71 @@
+# Tiny config for end-to-end smoke tests (fake REAL-Colon, CPU).
+paths:
+  data_root: ${oc.env:DATA_ROOT,./data}
+  out_root:  ${oc.env:OUT_ROOT,./runs_smoke}
+  realcolon: ${oc.env:REALCOLON_ROOT,/tmp/fake_real_colon}
+  gastronet: ${oc.env:GASTRONET_ROOT,./data/gastronet5m}
+  cache:   ${paths.out_root}/cache
+  results: ${paths.out_root}/results
+  ckpts:   ${paths.out_root}/ssl
+
+backbones:
+  arch: vit_base_patch16_224
+  img_size: 224
+  siglip2_timm_tag: vit_base_patch16_siglip_gap_224.v2_webli
+  siglip2_timm_tag_alt: vit_base_patch16_siglip_224.v2_webli
+  siglip2_openclip: ["ViT-B-16-SigLIP2", "webli"]
+  imagenet_tv_weights: IMAGENET1K_V1
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std:  [0.229, 0.224, 0.225]
+
+ssl:
+  stage: smoke
+  objective: lejepa
+  init: imagenet
+  lora: false
+  subset_images: 100
+  batch_size: 4
+  grad_accum: 1
+  num_workers: 0
+  base_lr: 1.0e-4
+  min_lr: 1.0e-6
+  weight_decay: 0.05
+  warmup_frac: 0.1
+  llrd: 0.75
+  grad_clip: 3.0
+  ema_base: 0.99
+  ckpt_every_steps: 50
+  smoke: {epochs: 1, max_images: 8, batch_size: 2, num_workers: 0}
+  full:  {epochs: 1, max_images: 0}
+  lejepa: {proj_dim: 128, pred_hidden_mult: 2, sigreg_lambda: 1.0, var_weight: 1.0, sigreg_slices: 64, sigreg_freqs: 8}
+  dino:   {out_dim: 512, n_local: 2, global_scale: [0.4, 1.0], local_scale: [0.05, 0.4],
+           student_temp: 0.1, teacher_temp: 0.04, teacher_temp_final: 0.07,
+           teacher_temp_warmup_frac: 0.3, center_momentum: 0.9, ibot: false, mask_ratio: 0.3}
+
+aug:
+  rrc_scale: [0.5, 1.0]
+  rotation_deg: 15
+  color_jitter: [0.3, 0.3, 0.3, 0.05]
+  blur_p: 0.0
+
+realcolon_tasks:
+  frame:  {neg_per_pos: 1, frame_stride: 1, min_box_area_frac: 0.0}
+  lesion: {crop_margin: 0.25, max_frames_per_lesion: 4,
+           adenoma: ["AD"], non_adenoma: ["HP", "SSL", "TSA"], drop: ["NO POLYP", "OTHER", ""]}
+  split:  {seed: 0, n_query: 2, n_reference: 3, n_cal: 1, stratify_on: ["study_id"]}
+
+eval:
+  img_size: 224
+  batch_size: 8
+  num_workers: 0
+  knn_k: 5
+  knn_tau: 0.07
+  knn_k_sweep: [3, 5]
+  feature_l2norm: true
+
+calibration:
+  n_bins: 5
+  adaptive_bins: 5
+  temp_max_iter: 50
+
+seed: 0

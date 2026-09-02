@@ -1,0 +1,119 @@
+# VLF_Zeiss — central config (OmegaConf). Env vars override via ${oc.env:VAR,default}.
+# On the LRZ cluster, lrz/job_env.sh exports DATA_ROOT / OUT_ROOT before any job runs.
+
+paths:
+  data_root: ${oc.env:DATA_ROOT,./data}
+  out_root:  ${oc.env:OUT_ROOT,./runs}
+
+  # REAL-Colon (Figshare download; ~1 TB, 60 videos). Layout after figshare download:
+  #   <realcolon>/<studyid>-<vid>_frames/*.jpg   and   <realcolon>/<studyid>-<vid>_annotations/*.xml
+  #   <realcolon>/video_info.csv   <realcolon>/lesion_info.csv
+  realcolon: ${oc.env:REALCOLON_ROOT,${paths.data_root}/real_colon}
+
+  # GastroNet-5M (gated; cortex.thetavision.nl). Layout: <gastronet>/*.zip  (<=10k PNGs per shard)
+  gastronet: ${oc.env:GASTRONET_ROOT,${paths.data_root}/gastronet5m}
+
+  # cached derived artefacts (manifests, splits, feature caches, results)
+  cache:   ${paths.out_root}/cache
+  results: ${paths.out_root}/results
+  ckpts:   ${paths.out_root}/ssl
+
+backbones:
+  # ViT-B/16 @ 224, feature = LayerNorm(mean over patch tokens) -> 768-d
+  arch: vit_base_patch16_224
+  img_size: 224
+  # SigLIP-2 vision tower: try this timm tag first, else open_clip fallback (see load_weights.py).
+  # *_gap_* = global-average-pool head (no attention-pool module); trunk weights are identical.
+  siglip2_timm_tag: vit_base_patch16_siglip_gap_224.v2_webli
+  siglip2_timm_tag_alt: vit_base_patch16_siglip_224.v2_webli
+  siglip2_openclip: ["ViT-B-16-SigLIP2", "webli"]
+  # ImageNet init: torchvision vit_b_16 IMAGENET1K_V1, converted into the timm module
+  imagenet_tv_weights: IMAGENET1K_V1
+  # ImageNet normalisation used for ALL eval feature extraction and ImageNet-init SSL.
+  # SigLIP-2 native norm is [0.5]*3; we standardise on ImageNet norm for a single eval path
+  # (documented deviation; parity test in tests/test_backbone_parity.py accounts for it).
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std:  [0.229, 0.224, 0.225]
+
+ssl:
+  stage: ${oc.env:STAGE,smoke}
+  objective: ${oc.env:OBJ,lejepa}          # lejepa | dino
+  init: ${oc.env:INIT,siglip2}             # siglip2 | imagenet
+  lora: false                              # full-backbone by default; --lora is a fallback
+  subset_images: ${oc.env:SUBSET_IMAGES,1200000}   # ~1-1.5M image subset of GastroNet-5M
+  batch_size: 128
+  grad_accum: 1
+  num_workers: 12
+  base_lr: 1.0e-4
+  min_lr: 1.0e-6
+  weight_decay: 0.05
+  warmup_frac: 0.1
+  llrd: 0.75                               # layer-wise LR decay
+  grad_clip: 3.0
+  ema_base: 0.9995                         # backbone weight-EMA (eval artefact)
+  ckpt_every_steps: 500
+  smoke: {epochs: 1, max_images: 2000, batch_size: 16, num_workers: 4}
+  full:  {epochs: 8, max_images: 0}        # 0 -> use ssl.subset_images
+
+  lejepa:
+    proj_dim: 512
+    pred_hidden_mult: 2
+    sigreg_lambda: 1.0
+    var_weight: 1.0
+    sigreg_slices: 256
+    sigreg_freqs: 16
+  dino:
+    out_dim: 8192
+    n_local: 6
+    global_scale: [0.4, 1.0]
+    local_scale: [0.05, 0.4]
+    student_temp: 0.1
+    teacher_temp: 0.04
+    teacher_temp_final: 0.07
+    teacher_temp_warmup_frac: 0.3
+    center_momentum: 0.9
+    ibot: false
+    mask_ratio: 0.3
+
+aug:            # endoscopy-safe SSL views: NO horizontal/vertical flip (laterality), NO grayscale
+  rrc_scale: [0.5, 1.0]
+  rotation_deg: 15
+  color_jitter: [0.3, 0.3, 0.3, 0.05]
+  blur_p: 0.3
+
+realcolon_tasks:
+  # T1: frame-level polyp vs no-polyp
+  frame:
+    neg_per_pos: 3                  # subsample clean frames to this ratio of positives
+    frame_stride: 5                 # take every Nth frame from each video before labelling
+    min_box_area_frac: 0.0          # ignore boxes smaller than this frac of the frame (0 = keep all)
+  # T2: lesion-crop adenoma vs non-adenoma
+  lesion:
+    crop_margin: 0.25               # expand each box by this frac on every side before cropping
+    max_frames_per_lesion: 40       # cap crops per lesion instance (avoid dominating videos)
+    adenoma: ["AD"]
+    non_adenoma: ["HP", "SSL", "TSA"]
+    drop: ["NO POLYP", "OTHER", ""]
+  split:
+    seed: 0
+    # 60 videos -> query / reference / cal  (held-out test / kNN support / temperature fit)
+    n_query: 24
+    n_reference: 28
+    n_cal: 8
+    stratify_on: ["study_id", "lesion_prevalence_bin"]
+
+eval:
+  img_size: 224
+  batch_size: 256
+  num_workers: 8
+  knn_k: 20
+  knn_tau: 0.07
+  knn_k_sweep: [10, 20, 50, 200]
+  feature_l2norm: true
+
+calibration:
+  n_bins: 15
+  adaptive_bins: 15
+  temp_max_iter: 100
+
+seed: 0
