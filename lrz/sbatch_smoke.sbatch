@@ -10,24 +10,25 @@
 #SBATCH --error=lrz/logs/%x_%j.err
 #
 # Full-codebase validation on a real GPU node: unit tests + LeJEPA/DINO SSL smoke
-# (ViT-B, EMA teacher) + end-to-end eval on a synthetic REAL-Colon tree.
-# No dataset downloads required (SSL smoke uses the staged HKV-unlabeled pool).
+# (ViT-B, EMA teacher) + end-to-end HyperKvasir eval + zero-shot segmentation.
+# No dataset downloads: SSL smoke uses the staged HKV-unlabeled pool.
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 source lrz/job_env.sh
 wait_for_gpu || { echo "bad node"; exit 1; }
 
+WORK="${SLURM_TMPDIR:-/tmp}/vlfz_smoke_$SLURM_JOB_ID"
+mkdir -p "$WORK"
 python -c "import torch; print('gpu:', torch.cuda.get_device_name(0), '| bf16:', torch.cuda.is_bf16_supported())"
 
 echo "==== unit tests ===="
 python -m pytest -q
 
 echo "==== SSL smoke (LeJEPA + DINO, ViT-B) ===="
-SMK_SSL="$OUT_ROOT/_smoke/ssl"; rm -rf "$SMK_SSL"
-OUT_ROOT="$SMK_SSL" ALL=1 bash tests/smoke_ssl.sh
+OUT_ROOT="$WORK/ssl" ALL=1 bash tests/smoke_ssl.sh
 
-echo "==== eval smoke (synthetic REAL-Colon, full pre/post/EDL) ===="
-SMK_EVAL="$OUT_ROOT/_smoke/eval"; rm -rf "$SMK_EVAL"
-SMK="$SMK_EVAL" bash tests/smoke_eval.sh
+echo "==== eval smoke (HyperKvasir: pre + SSL + post + segmentation) ===="
+SMK="$WORK/eval" bash tests/smoke_eval.sh
 
 echo "==== smoke OK ===="
+rm -rf "$WORK"
