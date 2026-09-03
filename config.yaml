@@ -3,15 +3,17 @@
 
 paths:
   data_root: ${oc.env:DATA_ROOT,./data}
-  out_root:  ${oc.env:OUT_ROOT,./runs}
+  # DSS project scratch is full -> keep outputs on the home quota (~100 GB).
+  out_root:  ${oc.env:OUT_ROOT,'~/vlf_zeiss_runs'}
 
-  # REAL-Colon (Figshare download; ~1 TB, 60 videos). Layout after figshare download:
-  #   <realcolon>/<studyid>-<vid>_frames/*.jpg   and   <realcolon>/<studyid>-<vid>_annotations/*.xml
-  #   <realcolon>/video_info.csv   <realcolon>/lesion_info.csv
+  # HyperKvasir (staged, read-only). Contains hyper_kvasir_{labeled,unlabeled,segmented}_images/.
+  hyperkvasir: ${oc.env:HKV_ROOT,${paths.data_root}}
+
+  # GastroNet-5M (authorised; cortex.thetavision.nl). Layout: <gastronet>/*.zip (<=10k PNGs per shard).
+  gastronet: ${oc.env:GASTRONET_ROOT,'~/vlf_zeiss_data/gastronet5m'}
+
+  # REAL-Colon (dropped for now; loader kept for later).
   realcolon: ${oc.env:REALCOLON_ROOT,${paths.data_root}/real_colon}
-
-  # GastroNet-5M (gated; cortex.thetavision.nl). Layout: <gastronet>/*.zip  (<=10k PNGs per shard)
-  gastronet: ${oc.env:GASTRONET_ROOT,${paths.data_root}/gastronet5m}
 
   # cached derived artefacts (manifests, splits, feature caches, results)
   cache:   ${paths.out_root}/cache
@@ -40,7 +42,9 @@ ssl:
   objective: ${oc.env:OBJ,lejepa}          # lejepa | dino
   init: ${oc.env:INIT,siglip2}             # siglip2 | imagenet
   lora: false                              # full-backbone by default; --lora is a fallback
-  subset_images: ${oc.env:SUBSET_IMAGES,1200000}   # ~1-1.5M image subset of GastroNet-5M
+  corpus: ${oc.env:CORPUS,gastronet}       # gastronet | hkv_unlabeled (staged 99k fallback)
+  # home quota is ~55 GB free -> keep the GastroNet-5M subset modest
+  subset_images: ${oc.env:SUBSET_IMAGES,700000}    # image subset of GastroNet-5M for SSL
   batch_size: 128
   grad_accum: 1
   num_workers: 12
@@ -81,26 +85,25 @@ aug:            # endoscopy-safe SSL views: NO horizontal/vertical flip (lateral
   color_jitter: [0.3, 0.3, 0.3, 0.05]
   blur_p: 0.3
 
-realcolon_tasks:
-  # T1: frame-level polyp vs no-polyp
-  frame:
-    neg_per_pos: 3                  # subsample clean frames to this ratio of positives
-    frame_stride: 5                 # take every Nth frame from each video before labelling
-    min_box_area_frac: 0.0          # ignore boxes smaller than this frac of the frame (0 = keep all)
-  # T2: lesion-crop adenoma vs non-adenoma
-  lesion:
-    crop_margin: 0.25               # expand each box by this frac on every side before cropping
-    max_frames_per_lesion: 40       # cap crops per lesion instance (avoid dominating videos)
-    adenoma: ["AD"]
-    non_adenoma: ["HP", "SSL", "TSA"]
-    drop: ["NO POLYP", "OTHER", ""]
+hyperkvasir:
+  # classification tasks: hkv_findings (23) | hkv_category (4) | hkv_tract (2) | hkv_pathology (2)
+  tasks: ${oc.env:HKV_TASKS,'hkv_findings,hkv_category,hkv_tract,hkv_pathology'}
+  min_class: 12            # hkv_findings: drop leaf classes with fewer images than this
   split:
     seed: 0
-    # 60 videos -> query / reference / cal  (held-out test / kNN support / temperature fit)
-    n_query: 24
-    n_reference: 28
-    n_cal: 8
-    stratify_on: ["study_id", "lesion_prevalence_bin"]
+    ref_frac: 0.60        # k-NN support
+    cal_frac: 0.15        # temperature / evidence-scale fit
+    # remainder (~0.25) -> query (held-out test)
+  seg:
+    n_support: 100        # labelled polyp masks used as the k-NN dense-label support set
+    patch_k: 10
+    patch_tau: 0.1
+
+realcolon_tasks:   # dropped for now; kept so vlfz.data.realcolon still imports
+  frame:  {neg_per_pos: 3, frame_stride: 5, min_box_area_frac: 0.0}
+  lesion: {crop_margin: 0.25, max_frames_per_lesion: 40,
+           adenoma: ["AD"], non_adenoma: ["HP", "SSL", "TSA"], drop: ["NO POLYP", "OTHER", ""]}
+  split:  {seed: 0, n_query: 24, n_reference: 28, n_cal: 8, stratify_on: ["study_id"]}
 
 eval:
   img_size: 224

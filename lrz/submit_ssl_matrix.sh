@@ -9,7 +9,8 @@ source lrz/job_env.sh
 mkdir -p lrz/logs
 
 STAGE="${STAGE:-full}"
-TIER="${TIER:-all}"     # all | lejepa | dino
+CORPUS="${CORPUS:-gastronet}"    # gastronet | hkv_unlabeled
+TIER="${TIER:-all}"             # all | lejepa | dino
 case "$TIER" in
   lejepa) OBJS=(lejepa) ;;
   dino)   OBJS=(dino) ;;
@@ -18,8 +19,8 @@ esac
 
 for OBJ in "${OBJS[@]}"; do
   for INIT in siglip2 imagenet; do
-    echo "submit SSL $OBJ/$INIT/$STAGE"
-    OBJ="$OBJ" INIT="$INIT" STAGE="$STAGE" sbatch lrz/sbatch_ssl_pretrain.sbatch
+    echo "submit SSL $OBJ/$INIT/$CORPUS/$STAGE"
+    OBJ="$OBJ" INIT="$INIT" STAGE="$STAGE" CORPUS="$CORPUS" sbatch lrz/sbatch_ssl_pretrain.sbatch
   done
 done
 echo "queued. watch: squeue --me ; tail -f lrz/logs/vlfz_ssl_*.out"

@@ -18,13 +18,13 @@ source lrz/job_env.sh
 wait_for_gpu || { echo "resubmitting (bad node)"; sbatch "$0"; exit 0; }
 
 OBJ="${OBJ:-lejepa}"; INIT="${INIT:-siglip2}"; STAGE="${STAGE:-full}"
-DATA="${DATA:-gastronet}"
-OUT_DIR="$OUT_ROOT/ssl/${OBJ}_${INIT}_${STAGE}"
+CORPUS="${CORPUS:-gastronet}"
+OUT_DIR="$OUT_ROOT/ssl/${OBJ}_${INIT}_${CORPUS}_${STAGE}"
 mkdir -p "$OUT_DIR"
 
-echo "[$(date)] SSL $OBJ/$INIT/$STAGE  job=$SLURM_JOB_ID  -> $OUT_DIR"
+echo "[$(date)] SSL $OBJ/$INIT/$CORPUS/$STAGE  job=$SLURM_JOB_ID  -> $OUT_DIR"
 srun python -m vlfz.ssl.pretrain \
-  --objective "$OBJ" --init "$INIT" --stage "$STAGE" --data "$DATA" --resume \
+  --objective "$OBJ" --init "$INIT" --stage "$STAGE" --corpus "$CORPUS" --resume \
   ${SSL_EXTRA:-}
 
 if [ -f "$OUT_DIR/DONE" ]; then

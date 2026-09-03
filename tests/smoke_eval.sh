@@ -1,28 +1,36 @@
 #!/bin/bash
-# End-to-end eval smoke on a synthetic REAL-Colon tree (CPU, ~2 min).
+# End-to-end eval smoke on the STAGED HyperKvasir data.
+# Core (pre-SSL zero-shot + aggregate) runs on a login node.
+# The SSL + post-SSL + segmentation steps need a GPU node (ViT-B OOMs a login
+# node); they are best-effort here (guarded with '|| echo skip').
 #   bash tests/smoke_eval.sh
-set -euo pipefail
+set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source lrz/job_env.sh
 export OMP_NUM_THREADS=4
 
 SMK="${SMK:-$(mktemp -d)}"
-export REALCOLON_ROOT="$SMK/fake_real_colon"
 export OUT_ROOT="$SMK/runs"
-export DATA_ROOT="${DATA_ROOT:-$MCMLSCRATCH/zeiss_data}"
 CFG=tests/smoke_config.yaml
+set -e
 
-echo "[smoke] workdir $SMK"
-python tests/make_fake_realcolon.py "$REALCOLON_ROOT"
-python -m vlfz.data.realcolon --config $CFG --inspect
+echo "[smoke] workdir $SMK  (HKV_ROOT=$HKV_ROOT)"
+python -m vlfz.data.hyperkvasir --config $CFG --inspect
 
-python -m vlfz.eval.run_eval --config $CFG --init imagenet --stage pre  --task all --protocols knn,eknn --edl-head
-
-# a throwaway 2-step SSL checkpoint so the 'post' path is exercised
-python -m vlfz.ssl.pretrain --config $CFG --objective lejepa --init imagenet --stage full \
-  --data smoke --fresh --limit-steps 2 --bs 2 --nw 0 --max-images 6
-python -m vlfz.eval.run_eval --config $CFG --init imagenet --objective lejepa --stage post \
+echo "[smoke] pre-SSL zero-shot (hkv_tract, hkv_category)"
+python -m vlfz.eval.run_eval --config $CFG --dataset hyperkvasir --init imagenet --stage pre \
   --task all --protocols knn,eknn --edl-head
+
+set +e
+echo "[smoke] (GPU-node) throwaway SSL checkpoint + post eval + segmentation"
+python -m vlfz.ssl.pretrain --config $CFG --objective lejepa --init imagenet --stage full \
+  --corpus hkv_unlabeled --fresh --limit-steps 2 --bs 2 --nw 0 --max-images 6 \
+  && python -m vlfz.eval.run_eval --config $CFG --dataset hyperkvasir --init imagenet \
+       --objective lejepa --corpus hkv_unlabeled --stage post --task all \
+       --protocols knn,eknn --edl-head \
+  || echo "[smoke] SSL/post skipped (needs a GPU node)"
+python -m vlfz.eval.seg --config $CFG --init imagenet --stage pre || echo "[smoke] seg skipped"
+set -e
 
 python -m vlfz.report.aggregate --config $CFG
 echo "[smoke] report:"; cat "$OUT_ROOT/results/report.md"

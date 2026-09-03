@@ -33,10 +33,11 @@ def _suspect(row) -> str:
 
 
 def _table(df: pd.DataFrame) -> str:
-    cols = ["init", "objective", "stage", "task", "protocol", "temp_scaled",
-            *_PRIMARY, *_CONTEXT]
+    cols = ["dataset", "init", "objective", "corpus", "stage", "task", "protocol",
+            "temp_scaled", *_PRIMARY, "dice", "miou", *_CONTEXT]
     cols = [c for c in cols if c in df.columns]
-    df = df.sort_values(["task", "protocol", "init", "objective", "stage", "temp_scaled"])
+    df = df.sort_values([c for c in ["dataset", "task", "protocol", "init", "objective",
+                                     "stage", "temp_scaled"] if c in df.columns])
     head = "| " + " | ".join(cols) + " |"
     sep = "| " + " | ".join("---" for _ in cols) + " |"
     lines = [head, sep]
@@ -47,7 +48,8 @@ def _table(df: pd.DataFrame) -> str:
 
 
 def write_pivot(df: pd.DataFrame, out_path: str, delta: pd.DataFrame | None = None):
-    parts = ["# VLF_Zeiss — zero-shot calibration on REAL-Colon\n",
+    dsets = "/".join(sorted(df["dataset"].dropna().unique())) if "dataset" in df else "?"
+    parts = [f"# VLF_Zeiss — zero-shot calibration on {dsets}\n",
              "Primary metrics: **ECE** (equal-width & adaptive) and **NLL**. "
              "`temp_scaled=T` rows are after scalar temperature / evidence-scale. "
              "⚠ = accuracy > 0.98 or balanced_acc > accuracy + 0.02 (inspect for leakage).\n",

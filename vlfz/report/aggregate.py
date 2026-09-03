@@ -12,9 +12,11 @@ from ..cfg import load_cfg
 from .pivot import write_pivot
 
 _ROW_COLS = [
-    "init", "objective", "stage", "task", "protocol", "temp_scaled", "T",
+    "dataset", "init", "objective", "corpus", "stage", "task", "protocol",
+    "temp_scaled", "T",
     "ece_ew", "ece_adaptive", "nll", "brier",
     "accuracy", "balanced_acc", "macro_f1", "auroc",
+    "dice", "miou", "nll_fg", "ece_ew_fg",
     "vacuity_mean", "entropy_mean", "err_auroc_vacuity", "err_auroc_entropy",
     "k", "n_query", "n_classes",
 ]
@@ -41,15 +43,15 @@ def collect(results_dir: str) -> pd.DataFrame:
 
 
 def delta_view(df: pd.DataFrame) -> pd.DataFrame:
-    """post - pre for matched (init, objective, task, protocol, temp_scaled)."""
-    keys = ["init", "objective", "task", "protocol", "temp_scaled"]
+    """post - pre for matched (dataset, init, objective, corpus, task, protocol, temp_scaled)."""
+    keys = ["dataset", "init", "objective", "corpus", "task", "protocol", "temp_scaled"]
     metrics = ["ece_ew", "ece_adaptive", "nll", "brier", "accuracy",
-               "balanced_acc", "auroc", "vacuity_mean"]
+               "balanced_acc", "auroc", "dice", "miou", "vacuity_mean"]
     pre = df[df.stage == "pre"].copy()
     post = df[df.stage == "post"].copy()
-    # pre has objective == "none"; match it to each objective's post
-    pre_any = pre.drop(columns=["objective"])
-    merged = post.merge(pre_any, on=[k for k in keys if k != "objective"],
+    # pre has objective/corpus == "none"; match it to each post variant
+    pre_any = pre.drop(columns=["objective", "corpus"])
+    merged = post.merge(pre_any, on=[k for k in keys if k not in ("objective", "corpus")],
                         suffixes=("_post", "_pre"))
     for m in metrics:
         if f"{m}_post" in merged and f"{m}_pre" in merged:

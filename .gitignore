@@ -6,12 +6,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 # run artefacts (kept on scratch $OUT_ROOT, never in the repo)
-runs/
-runs_smoke/
-runs_*/
-results/
-outputs/
-data/
+/runs/
+/runs_smoke/
+/runs_*/
+/results/
+/outputs/
+/data/
 *.npz
 *.pt
 *.ckpt

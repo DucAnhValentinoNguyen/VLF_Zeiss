@@ -1,9 +1,10 @@
-# Tiny config for end-to-end smoke tests (fake REAL-Colon, CPU).
+# Tiny config for end-to-end smoke tests on the STAGED HyperKvasir data (CPU).
 paths:
-  data_root: ${oc.env:DATA_ROOT,./data}
+  data_root: ${oc.env:DATA_ROOT,/dss/dssmcmlfs01/pr74ze/pr74ze-dss-0001/ra82sat2/zeiss_data}
   out_root:  ${oc.env:OUT_ROOT,./runs_smoke}
-  realcolon: ${oc.env:REALCOLON_ROOT,/tmp/fake_real_colon}
+  hyperkvasir: ${oc.env:HKV_ROOT,${paths.data_root}}
   gastronet: ${oc.env:GASTRONET_ROOT,./data/gastronet5m}
+  realcolon: ${oc.env:REALCOLON_ROOT,./data/real_colon}
   cache:   ${paths.out_root}/cache
   results: ${paths.out_root}/results
   ckpts:   ${paths.out_root}/ssl
@@ -23,6 +24,7 @@ ssl:
   objective: lejepa
   init: imagenet
   lora: false
+  corpus: hkv_unlabeled
   subset_images: 100
   batch_size: 4
   grad_accum: 1
@@ -48,6 +50,13 @@ aug:
   color_jitter: [0.3, 0.3, 0.3, 0.05]
   blur_p: 0.0
 
+hyperkvasir:
+  tasks: "hkv_tract,hkv_category"
+  min_class: 4
+  subset_per_class: 8          # cap images/class -> a few dozen total (CPU-fast)
+  split: {seed: 0, ref_frac: 0.60, cal_frac: 0.15}
+  seg:   {n_support: 6, patch_k: 5, patch_tau: 0.1}
+
 realcolon_tasks:
   frame:  {neg_per_pos: 1, frame_stride: 1, min_box_area_frac: 0.0}
   lesion: {crop_margin: 0.25, max_frames_per_lesion: 4,
@@ -56,7 +65,7 @@ realcolon_tasks:
 
 eval:
   img_size: 224
-  batch_size: 8
+  batch_size: 16
   num_workers: 0
   knn_k: 5
   knn_tau: 0.07

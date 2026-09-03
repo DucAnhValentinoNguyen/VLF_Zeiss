@@ -18,12 +18,12 @@ for OBJ in "${OBJS[@]}"; do
   for INIT in siglip2 imagenet; do
     echo "=== SSL smoke: $OBJ / $INIT ==="
     python -m vlfz.ssl.pretrain --config $CFG --objective "$OBJ" --init "$INIT" --stage smoke \
-      --data smoke --fresh --limit-steps 3 --bs 2 --nw 0 --max-images 8
-    D="$OUT_ROOT/ssl/${OBJ}_${INIT}_smoke"
+      --corpus hkv_unlabeled --fresh --limit-steps 3 --bs 2 --nw 0 --max-images 8
+    D="$OUT_ROOT/ssl/${OBJ}_${INIT}_hkv_unlabeled_smoke"
     test -f "$D/train_state.pt" && echo "  ok: $D/train_state.pt"
     # resume must not crash
     python -m vlfz.ssl.pretrain --config $CFG --objective "$OBJ" --init "$INIT" --stage smoke \
-      --data smoke --resume --limit-steps 5 --bs 2 --nw 0 --max-images 8
+      --corpus hkv_unlabeled --resume --limit-steps 5 --bs 2 --nw 0 --max-images 8
   done
 done
 echo "[smoke_ssl] OK  ($OUT_ROOT)"

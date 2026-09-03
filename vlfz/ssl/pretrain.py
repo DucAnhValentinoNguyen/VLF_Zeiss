@@ -2,8 +2,8 @@
 ImageNet ViT-B/16 init, full-backbone (``--lora`` is a fallback), single-GPU with
 self-resubmitting checkpoint/resume.
 
-    STAGE=smoke python -m vlfz.ssl.pretrain --objective lejepa --init siglip2 --data smoke
-    STAGE=full  python -m vlfz.ssl.pretrain --objective dino   --init imagenet
+    STAGE=smoke python -m vlfz.ssl.pretrain --objective lejepa --init siglip2 --corpus hkv_unlabeled
+    STAGE=full  python -m vlfz.ssl.pretrain --objective dino   --init imagenet --corpus gastronet
 """
 from __future__ import annotations
 
@@ -27,16 +27,7 @@ _IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
 
 # ---------------------------------------------------------------- data
-def _smoke_paths(cfg, n: int) -> list[str]:
-    root = os.path.join(os.path.expanduser(str(cfg.paths.data_root)),
-                        "hyper_kvasir_unlabeled_images")
-    paths = [p for p in glob(os.path.join(root, "**", "*"), recursive=True)
-             if p.lower().endswith(_IMG_EXTS)]
-    paths.sort()
-    return paths[:n] if n else paths
-
-
-class _SmokeDataset:
+class _PathListDataset:
     def __init__(self, paths, transform):
         self.paths, self.t = paths, transform
 
@@ -55,9 +46,11 @@ class _SmokeDataset:
 
 def _make_dataset(cfg, args, transform):
     smoke_n = int(args.max_images or cfg.ssl.smoke.max_images)
-    if args.data == "smoke":
-        n = smoke_n if args.stage == "smoke" else 0
-        return _SmokeDataset(_smoke_paths(cfg, n), transform)
+    n = smoke_n if args.stage == "smoke" else 0
+    if args.corpus == "hkv_unlabeled":
+        from ..data.hyperkvasir import unlabeled_paths
+
+        return _PathListDataset(unlabeled_paths(cfg, cap=n), transform)
     from ..data.gastronet import GastroNetDataset
 
     sub = smoke_n if args.stage == "smoke" else int(cfg.ssl.subset_images)
@@ -122,7 +115,7 @@ def train(cfg, args):
 
     out_dir = args.out or os.path.join(
         os.path.expanduser(str(cfg.paths.ckpts)),
-        f"{args.objective}_{args.init}_{args.stage}",
+        f"{args.objective}_{args.init}_{args.corpus}_{args.stage}",
     )
     ensure_dirs(out_dir)
     done_flag = os.path.join(out_dir, "DONE")
@@ -218,7 +211,7 @@ def train(cfg, args):
              "teacher": (teacher.ema.state_dict() if teacher is not None else None),
              "center": (center.detach().cpu() if center is not None else None),
              "gstep": gstep, "epoch_done": epoch_done,
-             "init": args.init, "objective": args.objective},
+             "init": args.init, "objective": args.objective, "corpus": args.corpus},
             state_path,
         )
 
@@ -226,8 +219,9 @@ def train(cfg, args):
         trunk = (teacher.ema["bb"].trunk if teacher is not None else ema_bb.ema.trunk)
         torch.save(
             {"ema_backbone": trunk.state_dict(), "init": args.init,
-             "objective": args.objective, "gstep": gstep,
-             "provenance": provenance(int(cfg.seed), objective=args.objective, init=args.init)},
+             "objective": args.objective, "corpus": args.corpus, "gstep": gstep,
+             "provenance": provenance(int(cfg.seed), objective=args.objective,
+                                      init=args.init, corpus=args.corpus)},
             os.path.join(out_dir, "ema_backbone.pt"),
         )
 
@@ -334,7 +328,8 @@ def main():
                     default=os.environ.get("INIT", "siglip2"))
     ap.add_argument("--stage", choices=["smoke", "full"],
                     default=os.environ.get("STAGE", "smoke"))
-    ap.add_argument("--data", choices=["gastronet", "smoke"], default="gastronet")
+    ap.add_argument("--corpus", choices=["gastronet", "hkv_unlabeled"],
+                    default=os.environ.get("CORPUS", "gastronet"))
     ap.add_argument("--out", default=None)
     ap.add_argument("--lora", action="store_true")
     ap.add_argument("--resume", action="store_true", default=True)
@@ -347,13 +342,12 @@ def main():
     ap.add_argument("--dino-out-dim", type=int, default=1024, help="smoke: cap DINO head dim")
     args = ap.parse_args()
     cfg = load_cfg(args.config)
-    if args.stage == "smoke" and args.data == "gastronet":
-        # smoke defaults to the staged HKV-unlabeled pool unless GastroNet zips exist
+    if args.corpus == "gastronet":
         from ..data.gastronet import shard_paths
 
         if not shard_paths(os.path.expanduser(str(cfg.paths.gastronet))):
-            args.data = "smoke"
-            print("[pretrain] no GastroNet shards -> smoke data = HKV-unlabeled")
+            args.corpus = "hkv_unlabeled"
+            print("[pretrain] no GastroNet shards -> corpus = hkv_unlabeled (staged 99k)")
     train(cfg, args)
 
 
