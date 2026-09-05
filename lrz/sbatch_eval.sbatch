@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=vlfz_eval
-#SBATCH --partition=lrz-hgx-h100-94x4,lrz-hgx-a100-80x4,lrz-dgx-a100-80x8
+#SBATCH --partition=lrz-hgx-h100-94x4,lrz-hgx-a100-80x4
 #SBATCH --qos=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12

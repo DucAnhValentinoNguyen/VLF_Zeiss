@@ -38,6 +38,10 @@ if [ "${ONLY_PRE:-0}" != "1" ]; then
   done
 fi
 
-echo "final aggregate (after: $DEPS)"
-sbatch --dependency=afterany:"$DEPS" lrz/sbatch_aggregate.sbatch
-echo "done. squeue --me"
+# aggregate is pure pandas -- no GPU, runs in seconds on the login node, and
+# is far more reliable there than fighting venv-visibility on compute nodes.
+echo
+echo "eval jobs queued: $DEPS"
+echo "when they finish (squeue --me), run the report on the login node:"
+echo "    source lrz/job_env.sh && python -m vlfz.report.aggregate"
+echo "    cat \$OUT_ROOT/results/report.md"
