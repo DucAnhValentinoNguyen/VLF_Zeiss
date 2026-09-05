@@ -29,15 +29,18 @@ esac; done
 
 if [ "$DO_INGEST" = 1 ]; then
   echo "== ingest: portal -> s3://$BUCKET/raw/ =="
-  AUTH=()
-  if [ -n "${PORTAL_SECRET_ARN:-}" ]; then
-    aws secretsmanager get-secret-value --secret-id "$PORTAL_SECRET_ARN" \
-      --region "$REGION" --query SecretString --output text > /opt/gastronet/portal.json
+  PJ=/opt/gastronet/portal.json
+  if [ ! -f "$PJ" ]; then
+    if [ -n "${PORTAL_SECRET_ARN:-}" ]; then
+      aws secretsmanager get-secret-value --secret-id "$PORTAL_SECRET_ARN" \
+        --region "$REGION" --query SecretString --output text > "$PJ"
+    else
+      aws s3 cp "s3://$BUCKET/bootstrap/portal.json" "$PJ"
+    fi
   fi
-  [ -f /opt/gastronet/portal.json ] && AUTH+=(--portal-json /opt/gastronet/portal.json)
-  [ -f /opt/gastronet/urls.txt ]    && AUTH+=(--url-list /opt/gastronet/urls.txt)
-  $PY "$PIPELINE_SRC/ingest/portal_to_s3.py" \
-      --bucket "$BUCKET" --raw-prefix raw/ --workdir "$RAW" "${AUTH[@]}"
+  "$PY" -m pip install --quiet requests >/dev/null 2>&1 || true
+  "$PY" "$PIPELINE_SRC/ingest/portal_to_s3.py" \
+      --bucket "$BUCKET" --raw-prefix raw/ --workdir "$RAW" --portal-json "$PJ"
 fi
 
 if [ "$DO_CATALOG" = 1 ]; then
