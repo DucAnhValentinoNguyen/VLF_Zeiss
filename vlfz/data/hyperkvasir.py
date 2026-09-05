@@ -141,25 +141,44 @@ def global_split(cfg, *, force: bool = False) -> dict[str, list[str]]:
     return parts
 
 
+def canonical_classes(cfg, task: str, *, force: bool = False) -> list[str]:
+    """The task's label set + ordering, derived ONCE from the global (all-splits)
+    label distribution and cached. Must be split-independent: `min_class` is
+    applied to global counts, not per-split, or the same string label would map
+    to different integers in reference vs query (silently wrecks k-NN)."""
+    if task not in CLS_TASKS:
+        raise ValueError(f"{task} is not a classification task")
+    cache = os.path.abspath(os.path.expanduser(str(cfg.paths.cache)))
+    os.makedirs(cache, exist_ok=True)
+    fp = os.path.join(cache, f"hkv_classes_{task}.json")
+    if os.path.exists(fp) and not force:
+        return json.load(open(fp))
+
+    min_class = int(cfg.hyperkvasir.min_class) if task == "hkv_findings" else 0
+    counts: dict[str, int] = defaultdict(int)
+    for _, lab in scan_labeled_images(cfg):
+        counts[_task_label(lab, task)] += 1
+    classes = sorted(c for c, n in counts.items() if n >= max(1, min_class))
+    json.dump(classes, open(fp, "w"))
+    return classes
+
+
 def build_task(cfg, task: str, split: str) -> list[tuple[str, int]]:
     """[(image_path, int_label)] for one classification task + split."""
     if task not in CLS_TASKS:
         raise ValueError(f"{task} is not a classification task")
     want = set(global_split(cfg)[split])
-    min_class = int(cfg.hyperkvasir.min_class) if task == "hkv_findings" else 0
     per_class = int(getattr(cfg.hyperkvasir, "subset_per_class", 0) or 0)
+
+    classes = canonical_classes(cfg, task)
+    c2i = {c: i for i, c in enumerate(classes)}
 
     rows = []
     for p, lab in scan_labeled_images(cfg):
         stem = os.path.splitext(os.path.basename(p))[0]
-        if stem in want:
-            rows.append((p, _task_label(lab, task)))
-
-    counts = defaultdict(int)
-    for _, y in rows:
-        counts[y] += 1
-    keep = {c for c, n in counts.items() if n >= max(1, min_class)}
-    rows = [(p, y) for p, y in rows if y in keep]
+        y = _task_label(lab, task)
+        if stem in want and y in c2i:
+            rows.append((p, y))
 
     if per_class:                                   # smoke: cap images per class
         seen: dict = defaultdict(int)
@@ -168,26 +187,14 @@ def build_task(cfg, task: str, split: str) -> list[tuple[str, int]]:
             if seen[y] < per_class:
                 capped.append((p, y)); seen[y] += 1
         rows = capped
-    classes = sorted({y for _, y in rows})
-    c2i = {c: i for i, c in enumerate(classes)}
+
     samples = [(p, c2i[y]) for p, y in rows]
-    _persist_classes(cfg, task, classes)
     print(f"[hkv:{task}/{split}] {len(samples)} imgs, {len(classes)} classes: {classes}")
     return samples
 
 
-def _persist_classes(cfg, task: str, classes: list[str]) -> None:
-    cache = os.path.abspath(os.path.expanduser(str(cfg.paths.cache)))
-    os.makedirs(cache, exist_ok=True)
-    json.dump(classes, open(os.path.join(cache, f"hkv_classes_{task}.json"), "w"))
-
-
 def n_classes(cfg, task: str) -> int:
-    cache = os.path.abspath(os.path.expanduser(str(cfg.paths.cache)))
-    fp = os.path.join(cache, f"hkv_classes_{task}.json")
-    if os.path.exists(fp):
-        return len(json.load(open(fp)))
-    return len({y for _, y in build_task(cfg, task, "reference")})
+    return len(canonical_classes(cfg, task))
 
 
 # --------------------------------------------------------------- segmentation io
