@@ -19,7 +19,7 @@ python -m vlfz.data.hyperkvasir --config $CFG --inspect
 
 echo "[smoke] pre-SSL zero-shot (hkv_tract, hkv_category)"
 python -m vlfz.eval.run_eval --config $CFG --dataset hyperkvasir --init imagenet --stage pre \
-  --task all --protocols knn,eknn --edl-head
+  --task all --protocols knn
 
 set +e
 echo "[smoke] (GPU-node) throwaway SSL checkpoint + post eval + segmentation"
@@ -27,7 +27,7 @@ python -m vlfz.ssl.pretrain --config $CFG --objective lejepa --init imagenet --s
   --corpus hkv_unlabeled --fresh --limit-steps 2 --bs 2 --nw 0 --max-images 6 \
   && python -m vlfz.eval.run_eval --config $CFG --dataset hyperkvasir --init imagenet \
        --objective lejepa --corpus hkv_unlabeled --stage post --task all \
-       --protocols knn,eknn --edl-head \
+       --protocols knn \
   || echo "[smoke] SSL/post skipped (needs a GPU node)"
 python -m vlfz.eval.seg --config $CFG --init imagenet --stage pre || echo "[smoke] seg skipped"
 set -e

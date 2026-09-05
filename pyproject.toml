@@ -6,6 +6,7 @@ requires-python = ">=3.10,<3.11"
 dependencies = [
     "torch==2.5.1",
     "torchvision==0.20.1",
+    "lightning>=2.4,<3",
     "timm>=1.0.15,<1.1",
     "open_clip_torch>=2.31,<4",
     "torchmetrics>=1.4,<2",
@@ -19,10 +20,21 @@ dependencies = [
     "pandas>=2.0",
     "tabulate>=0.9",
     "requests>=2.31",
+    # gastronet_source defaults to s3_webdataset (streamed from the AWS lake,
+    # see pipeline/) -> boto3 + webdataset are on the default SSL training path.
+    "boto3>=1.34",
+    "webdataset>=0.2.86,<1.1",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# GastroNet-5M lake build tooling (ingest/catalog/curate/dq — see pipeline/).
+# Not needed to run training/eval against an already-curated tier.
+pipeline = [
+    "pyarrow>=15",
+    "matplotlib>=3.7",
+    "prefect>=2.19; python_version < '3.13'",
+]
 
 [project.scripts]
 vlfz-pretrain = "vlfz.ssl.pretrain:main"

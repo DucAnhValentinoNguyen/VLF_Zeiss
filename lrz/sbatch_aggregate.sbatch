@@ -12,7 +12,10 @@ set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 source lrz/job_env.sh
 
-echo "[$(date)] leakage audit + aggregate"
-srun python -m vlfz.report.leakage_audit || echo "leakage audit skipped"
-srun python -m vlfz.report.aggregate
+# aggregate is pure pandas/omegaconf, no GPU. Invoke the venv python by full
+# path -- `srun` does not reliably carry job_env.sh's PATH edit onto the step.
+PY="$VIRTUAL_ENV/bin/python"
+echo "[$(date)] leakage audit + aggregate  ($PY)"
+"$PY" -m vlfz.report.leakage_audit || echo "leakage audit skipped"
+"$PY" -m vlfz.report.aggregate
 echo "[$(date)] -> $OUT_ROOT/results/report.md"

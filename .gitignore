@@ -22,3 +22,19 @@ slurm-*.out
 *.err
 # local scratch
 .DS_Store
+# cloud pipeline: never commit state or secrets
+pipeline/infra/.terraform/
+pipeline/infra/.terraform.lock.hcl
+pipeline/infra/.build/
+*.tfstate
+*.tfstate.*
+*.tfvars
+tf.plan
+.aws/
+*accessKeys*
+*_accessKeys.csv
+pipeline/**/secrets*
+pipeline/**/portal.json
+pipeline/**/urls.txt
+shard_list.txt
+.gastronet_bucket

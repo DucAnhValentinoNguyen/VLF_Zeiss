@@ -4,11 +4,11 @@ dataset  = hyperkvasir | realcolon
 setting  = (init, objective)      objective ignored when stage == "pre"
 stage    = pre | post             post loads <ckpts>/{objective}_{init}_{corpus}_full/ema_backbone.pt
 task     = a classification task of the dataset, or "all"
-protocol = knn | eknn | elin(opt-in)
+protocol = knn (weighted k-NN, temperature-scaled)
 
-Each protocol yields pre/post-calibration rows (temperature for knn/elin,
-evidence-scale lambda for eknn) with ECE/NLL/Brier + context metrics (+ vacuity /
-err-AUROC for the evidential protocols).
+Kept deliberately to one protocol — evidential deep learning (Dirichlet k-NN /
+evidential linear head) was evaluated and dropped in favour of a simpler
+benchmark; see vlfz/eval/edl.py (kept, unused) if that's revisited.
 """
 from __future__ import annotations
 
@@ -16,13 +16,10 @@ import argparse
 import json
 import os
 
-import numpy as np
-
 from ..cfg import ensure_dirs, load_cfg, provenance, set_seed
 from ..data.registry import get_dataset
 from ..models.vit_backbone import build_vit_b16
-from .calibration import calibration_report, metric_block
-from .edl import evidential_knn, fit_evidence_scale, train_evidential_head, uncertainty_block
+from .calibration import calibration_report
 from .features import extract_features
 from .knn import knn_k_sweep, knn_vote
 from .metrics import context_metrics, flatten_report
@@ -55,7 +52,7 @@ def _rows_from_report(rep, *, base, protocol, extra=None):
 
 
 def evaluate(cfg, *, dataset, init, objective, stage, task, protocols, corpus="gastronet",
-             edl_head=False, recompute=False) -> dict:
+             recompute=False) -> dict:
     set_seed(int(cfg.seed))
     ds = get_dataset(dataset)
     C = ds.n_classes(cfg, task)
@@ -99,30 +96,6 @@ def evaluate(cfg, *, dataset, init, objective, stage, task, protocols, corpus="g
         aux["knn_k_sweep"] = knn_k_sweep(Xr, yr, Xq, yq, list(cfg.eval.knn_k_sweep),
                                          n_classes=C, tau=tau)
 
-    if "eknn" in protocols:
-        k, tau = int(cfg.eval.knn_k), float(cfg.eval.knn_tau)
-        q = knn_vote(Xr, yr, Xq, n_classes=C, k=k, tau=tau)
-        c = knn_vote(Xr, yr, Xc, n_classes=C, k=k, tau=tau)
-        lam = fit_evidence_scale(c["vote_mass"], yc)
-        pre = evidential_knn(q["vote_mass"], scale=1.0)
-        post = evidential_knn(q["vote_mass"], scale=lam)
-        ctx = context_metrics(yq, pre["prob"])
-        for scaled, s in ((False, pre), (True, post)):
-            mb = metric_block(s["prob"], yq, nb, ab)
-            ub = uncertainty_block(s["prob"], s["vacuity"], yq)
-            rows.append({**base, **ctx, "protocol": "eknn", "temp_scaled": scaled,
-                         "T": (lam if scaled else None), "k": q["k"],
-                         "ece_ew": mb["ece_ew"], "ece_adaptive": mb["ece_adaptive"],
-                         "nll": mb["nll"], "brier": mb["brier"], **ub})
-
-    if edl_head and "elin" in protocols:
-        out = train_evidential_head(Xr, yr, Xq, Xc, n_classes=C, seed=int(cfg.seed))
-        qh, ch = out["query"], out["cal"]
-        rep = calibration_report(qh["logits"], yq, ch["logits"], yc, n_bins=nb, adaptive_bins=ab)
-        ctx = context_metrics(yq, qh["prob"])
-        ub = uncertainty_block(qh["prob"], qh["vacuity"], yq)
-        rows += _rows_from_report(rep, base={**base, **ctx}, protocol="elin", extra=ub)
-
     out = {"tag": tag, "dataset": dataset, "init": init, "objective": base["objective"],
            "corpus": base["corpus"], "stage": stage, "task": task, "rows": rows, "aux": aux,
            "splits": ds.split_sizes(cfg),
@@ -144,15 +117,12 @@ def main():
                     choices=["gastronet", "hkv_unlabeled"])
     ap.add_argument("--stage", choices=["pre", "post"], required=True)
     ap.add_argument("--task", default="all")
-    ap.add_argument("--protocols", default="knn,eknn")
-    ap.add_argument("--edl-head", action="store_true")
+    ap.add_argument("--protocols", default="knn")
     ap.add_argument("--recompute", action="store_true")
     a = ap.parse_args()
     cfg = load_cfg(a.config)
     ds = get_dataset(a.dataset)
     protocols = [p.strip() for p in a.protocols.split(",") if p.strip()]
-    if a.edl_head and "elin" not in protocols:
-        protocols.append("elin")
 
     if a.task == "all":
         tasks = list(ds.cls_tasks)
@@ -170,8 +140,7 @@ def main():
 
     for t in tasks:
         evaluate(cfg, dataset=a.dataset, init=a.init, objective=a.objective, stage=a.stage,
-                 task=t, protocols=protocols, corpus=a.corpus, edl_head=a.edl_head,
-                 recompute=a.recompute)
+                 task=t, protocols=protocols, corpus=a.corpus, recompute=a.recompute)
 
 
 if __name__ == "__main__":

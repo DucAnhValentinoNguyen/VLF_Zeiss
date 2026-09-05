@@ -17,7 +17,6 @@ _ROW_COLS = [
     "ece_ew", "ece_adaptive", "nll", "brier",
     "accuracy", "balanced_acc", "macro_f1", "auroc",
     "dice", "miou", "nll_fg", "ece_ew_fg",
-    "vacuity_mean", "entropy_mean", "err_auroc_vacuity", "err_auroc_entropy",
     "k", "n_query", "n_classes",
 ]
 
@@ -46,7 +45,7 @@ def delta_view(df: pd.DataFrame) -> pd.DataFrame:
     """post - pre for matched (dataset, init, objective, corpus, task, protocol, temp_scaled)."""
     keys = ["dataset", "init", "objective", "corpus", "task", "protocol", "temp_scaled"]
     metrics = ["ece_ew", "ece_adaptive", "nll", "brier", "accuracy",
-               "balanced_acc", "auroc", "dice", "miou", "vacuity_mean"]
+               "balanced_acc", "auroc", "dice", "miou"]
     pre = df[df.stage == "pre"].copy()
     post = df[df.stage == "post"].copy()
     # pre has objective/corpus == "none"; match it to each post variant

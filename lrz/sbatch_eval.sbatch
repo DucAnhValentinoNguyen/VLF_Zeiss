@@ -21,12 +21,10 @@ wait_for_gpu || { echo "resubmitting (bad node)"; sbatch "$0"; exit 0; }
 DATASET="${DATASET:-hyperkvasir}"
 INIT="${INIT:-siglip2}"; STAGE="${STAGE:-pre}"; OBJ="${OBJ:-lejepa}"
 CORPUS="${CORPUS:-gastronet}"
-PROTOCOLS="${PROTOCOLS:-knn,eknn}"
-EDL_HEAD="${EDL_HEAD:-1}"
+PROTOCOLS="${PROTOCOLS:-knn}"
 
 ARGS=(--dataset "$DATASET" --init "$INIT" --stage "$STAGE" --objective "$OBJ"
       --corpus "$CORPUS" --task all --protocols "$PROTOCOLS")
-[ "$EDL_HEAD" = "1" ] && ARGS+=(--edl-head)
 
 echo "[$(date)] eval ${DATASET}/${INIT}/${STAGE}/${OBJ}/${CORPUS}  job=$SLURM_JOB_ID"
 srun python -m vlfz.eval.run_eval "${ARGS[@]}"

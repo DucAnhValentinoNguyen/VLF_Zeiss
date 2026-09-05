@@ -4,7 +4,7 @@ from __future__ import annotations
 import pandas as pd
 
 _PRIMARY = ["ece_ew", "ece_adaptive", "nll"]
-_CONTEXT = ["accuracy", "balanced_acc", "auroc", "vacuity_mean"]
+_CONTEXT = ["accuracy", "balanced_acc", "auroc"]
 
 
 def _fmt(v):
@@ -51,7 +51,7 @@ def write_pivot(df: pd.DataFrame, out_path: str, delta: pd.DataFrame | None = No
     dsets = "/".join(sorted(df["dataset"].dropna().unique())) if "dataset" in df else "?"
     parts = [f"# VLF_Zeiss — zero-shot calibration on {dsets}\n",
              "Primary metrics: **ECE** (equal-width & adaptive) and **NLL**. "
-             "`temp_scaled=T` rows are after scalar temperature / evidence-scale. "
+             "`temp_scaled=T` rows are after scalar temperature scaling. "
              "⚠ = accuracy > 0.98 or balanced_acc > accuracy + 0.02 (inspect for leakage).\n",
              "## All results\n", _table(df), "\n"]
     if delta is not None and not delta.empty:

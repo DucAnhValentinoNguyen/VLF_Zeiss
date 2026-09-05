@@ -1,6 +1,10 @@
 """Evidential Deep Learning (Sensoy et al. 2018, arXiv:1806.01768).
 
-Two uses in this pipeline:
+DORMANT (2026-09-04): evaluated, then dropped from the active pipeline in
+favour of a single temperature-scaled k-NN protocol — see run_eval.py. Kept,
+unimported, as a reference implementation.
+
+Two uses this module supported:
 
   1. Evidential k-NN (training-free, default ON) — the weighted neighbour
      vote mass IS Dirichlet evidence: ``alpha_c = lambda * vote_mass_c + 1``.

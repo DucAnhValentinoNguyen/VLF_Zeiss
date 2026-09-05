@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is git-ignored.
+
+alert_email = "ducanhnguyendl@gmail.com"
+
+# Optional: pin a bucket name (else gastronet5m-lake-<account_id>-euno1).
+# bucket_name = "gastronet5m-lake"
+
+# raw/ cold-storage class: GLACIER_IR (~$4/TB/mo, instant) or DEEP_ARCHIVE (~$1/TB/mo, ~12h restore).
+raw_storage_class  = "GLACIER_IR"
+raw_to_glacier_days = 30
+
+# Ingest/curation box. c7i.2xlarge spot ~ $0.12/hr in eu-north-1; a few hours total.
+ingest_instance_type = "c7i.2xlarge"
+ingest_use_spot      = true
+ingest_root_gb       = 1200      # must hold ~1 TB of raw zips while curating
+
+# false: box boots and waits; you drive each step over SSM (recommended first run).
+# true:  box runs ingest->catalog->curate->dq on boot, then self-terminates.
+auto_run_ingest = false
+
+# Optional SSH key pair name for debugging (SSM works without it).
+# ingest_key_name = "my-keypair"
+
+# Optional: a Secrets Manager secret holding portal auth (see pipeline/ingest/README).
+# portal_secret_arn = "arn:aws:secretsmanager:eu-north-1:...:secret:gastronet-portal-xxxx"

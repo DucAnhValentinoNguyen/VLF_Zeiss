@@ -43,8 +43,22 @@ ssl:
   init: ${oc.env:INIT,siglip2}             # siglip2 | imagenet
   lora: false                              # full-backbone by default; --lora is a fallback
   corpus: ${oc.env:CORPUS,gastronet}       # gastronet | hkv_unlabeled (staged 99k fallback)
-  # home quota is ~55 GB free -> keep the GastroNet-5M subset modest
-  subset_images: ${oc.env:SUBSET_IMAGES,700000}    # image subset of GastroNet-5M for SSL
+  # GastroNet-5M read path (see pipeline/README.md):
+  #   local_webdataset -> $GASTRONET_ROOT/webdataset/*.tar  (curated tier, default)
+  #   local_zip        -> $GASTRONET_ROOT/*.zip             (raw portal shards)
+  #   s3_webdataset    -> s3://$GASTRONET_BUCKET/webdataset/ (stream; egress $$ per pass)
+  # Default = stream from the S3 lake with a local shard cache: epoch 1 fetches
+  # each .tar over presigned HTTPS (one-time egress ~$5 for the curated tier),
+  # every later epoch / job resubmit reads $GASTRONET_ROOT/.wds_cache instead.
+  gastronet_source: ${oc.env:GASTRONET_SOURCE,s3_webdataset}
+  gastronet_bucket: ${oc.env:GASTRONET_BUCKET,''}
+  wds_cache_dir: ${oc.env:WDS_CACHE_DIR,${paths.gastronet}/.wds_cache}
+  wds_cache_size_bytes: -1                 # -1 = unlimited (curated tier is ~50 GB)
+  s3_presign_seconds: 86400                # presigned GET URL lifetime (regenerated per job launch)
+  wds_images_per_shard: 10000              # curate_shard.py --pack; used to size an epoch
+  steps_per_epoch: ${oc.env:STEPS_PER_EPOCH,0}   # 0 -> derive from shard count / bs
+  # local_zip only: class/shard-balanced image subset (full webdataset tier ignores this)
+  subset_images: ${oc.env:SUBSET_IMAGES,700000}
   batch_size: 128
   grad_accum: 1
   num_workers: 12

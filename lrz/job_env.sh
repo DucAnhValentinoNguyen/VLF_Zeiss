@@ -32,6 +32,16 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # import vlfz without installing (editable install also works; this is the fallback)
 export PYTHONPATH="$VLF_ROOT:${PYTHONPATH:-}"
 
+# --- AWS (read-only) for staging the curated GastroNet-5M tier from S3 ---
+# Creds live in ~/.aws/credentials [gastronet-reader] (chmod 600, never committed).
+# GASTRONET_BUCKET = `terraform output bucket`; drop it in ~/.gastronet_bucket.
+export AWS_PROFILE="${AWS_PROFILE:-gastronet-reader}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-eu-north-1}"
+[ -z "${GASTRONET_BUCKET:-}" ] && [ -f "$HOME/.gastronet_bucket" ] && \
+  export GASTRONET_BUCKET="$(cat "$HOME/.gastronet_bucket")"
+export GASTRONET_SOURCE="${GASTRONET_SOURCE:-local_webdataset}"
+export PATH="$HOME/bin:$PATH"
+
 # Robust GPU readiness check: torch.cuda.is_available() can transiently return False
 # right after allocation on a busy shared node (NVML init race). Usage: wait_for_gpu || exit 1
 wait_for_gpu() {

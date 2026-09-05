@@ -4,12 +4,17 @@ One code path for every backbone (all are ViTBackbone). Given a list of
 ``(image_path, label)`` samples it returns ``{X: (N, 768), y: (N,)}`` and caches
 it under ``<cache>/<key>.npz`` where key hashes (backbone tag, img_size, sample
 paths + labels).
+
+Runs the forward pass through a PyTorch Lightning ``Trainer.predict()`` — same
+device/precision handling as SSL training (``vlfz/ssl/pretrain.py``), just a
+predict-only, one-batch-of-hooks LightningModule; no gradients, no checkpoints.
 """
 from __future__ import annotations
 
 import hashlib
 import os
 
+import lightning.pytorch as pl
 import numpy as np
 
 
@@ -40,6 +45,17 @@ class _PathDataset:
         return self.t(img), int(y), i
 
 
+class _FeatModule(pl.LightningModule):
+    def __init__(self, backbone):
+        super().__init__()
+        self.backbone = backbone.eval()
+
+    def predict_step(self, batch, batch_idx):
+        xb, yb, idx = batch
+        f = self.backbone.feature(xb).float()
+        return f.cpu(), yb, idx
+
+
 @np.errstate(all="ignore")
 def extract_features(
     backbone,
@@ -64,7 +80,6 @@ def extract_features(
         return {"X": d["X"], "y": d["y"], "cache": path, "hit": True}
 
     dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    backbone = backbone.to(dev).eval()
     dl = DataLoader(
         _PathDataset(samples, eval_transform(cfg)),
         batch_size=int(cfg.eval.batch_size),
@@ -72,16 +87,21 @@ def extract_features(
         pin_memory=(dev == "cuda"),
         shuffle=False,
     )
+    module = _FeatModule(backbone)
+    trainer = pl.Trainer(
+        accelerator=("gpu" if dev == "cuda" else "cpu"), devices=1,
+        precision=("bf16-mixed" if dev == "cuda" else 32),
+        logger=False, enable_checkpointing=False, enable_progress_bar=False,
+        enable_model_summary=False,
+    )
+    batches = trainer.predict(module, dataloaders=dl)
+
     feats = np.empty((len(samples), backbone.embed_dim), dtype=np.float32)
     ys = np.empty(len(samples), dtype=np.int64)
-    with torch.no_grad():
-        for xb, yb, idx in dl:
-            xb = xb.to(dev, non_blocking=True)
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=(dev == "cuda")):
-                f = backbone.feature(xb).float()
-            idx = idx.numpy()
-            feats[idx] = f.cpu().numpy()
-            ys[idx] = yb.numpy()
+    for f, yb, idx in batches:
+        idx = idx.numpy()
+        feats[idx] = f.numpy()
+        ys[idx] = yb.numpy()
     feats = np.nan_to_num(feats, nan=0.0, posinf=0.0, neginf=0.0)
     np.savez(path, X=feats, y=ys)
     return {"X": feats, "y": ys, "cache": path, "hit": False}
