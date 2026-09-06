@@ -852,3 +852,47 @@ in the background).
   then the existing eval chain (Phase 6) runs unchanged on the new checkpoints.
 - **Cost**: AWS Budgets alarm armed; Cost Explorer after week 1 shows egress
   ≈ one-time stage-in only (no per-epoch S3 GET spikes).
+
+---
+
+## Execution status — 2026-09-06
+
+**Phase 4 (before-SSL eval): DONE.** Both siglip2 + imagenet frozen ViT-B/16,
+zero-shot weighted k-NN on all 4 HyperKvasir classification tasks + zero-shot
+polyp segmentation. First real report at `$OUT_ROOT/results/report.md`:
+
+| task | imagenet acc / AUROC | siglip2 acc / AUROC |
+|---|---|---|
+| hkv_tract     | 0.995 / 0.999 ⚠ | 0.987 / 0.998 ⚠ |
+| hkv_pathology | 0.942 / 0.983    | 0.908 / 0.957   |
+| hkv_category  | 0.940 / 0.992    | 0.897 / 0.980   |
+| hkv_findings (20-way) | 0.846 / 0.947 | 0.763 / 0.923 |
+| hkv_seg       | Dice 0.667      | Dice 0.314      |
+
+ImageNet init beats SigLIP-2 on every HyperKvasir task here — the SSL runs test
+whether in-domain pretraining changes that and (the actual question) the
+calibration.
+
+**Phase 5 (SSL on GastroNet-5M): in progress.**
+- SSL code migrated to PyTorch Lightning, validated end-to-end on an A100
+  (all 4 settings, checkpoints + `ema_backbone.pt` in the shape `run_eval`
+  reads). The intermittent CPU hang chased earlier is login-node-only.
+- EDL dropped from the benchmark (one temperature-scaled `knn` protocol).
+- `hkv_findings` label-alignment bug fixed (`canonical_classes`, global not
+  per-split) — 2.9% → 84.6%.
+- AWS data lake fully provisioned (bucket / IAM / Glue+Athena / cost budget /
+  ephemeral spot EC2). Read-only `gastronet-lake-ro` policy attached to the
+  LRZ `read-only-agent` user (inline — the 10-managed-policy quota was hit).
+- Cortex portal ingest reverse-engineered + implemented: per-file
+  `POST /api/provided_file/<id>/download_url/` → 10-min presigned URL on
+  `s3.thetavision.nl` → streamed to `raw/` with Range-resume. `portal.json`
+  (session cookie + 506-file list) lives at `s3://<bucket>/bootstrap/`.
+- **Running now:** `pipeline/kick_ingest.sh 60` — a 60-zip subset (~250 GB,
+  ~800k–1M images; full corpus is 1.88 TB / 506 zips) ingesting on the spot
+  EC2, then catalog → curate → dq. The spot instance was reclaimed once and
+  recreated (`i-091679f565fb6d44d`).
+
+**Next:** when `dq/data_report.md` appears, stage or stream the curated tier and
+`bash lrz/submit_ssl_matrix.sh` (4 self-resubmitting runs). Then Phase 6:
+`submit_eval_chain.sh` picks up the `ema_backbone.pt`s and produces the
+16-row pre-vs-post delta table.
