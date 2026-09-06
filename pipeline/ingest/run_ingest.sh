@@ -39,8 +39,9 @@ if [ "$DO_INGEST" = 1 ]; then
     fi
   fi
   "$PY" -m pip install --quiet requests >/dev/null 2>&1 || true
+  LIM=(); [ -n "${INGEST_LIMIT:-}" ] && LIM=(--limit "$INGEST_LIMIT")
   "$PY" "$PIPELINE_SRC/ingest/portal_to_s3.py" \
-      --bucket "$BUCKET" --raw-prefix raw/ --workdir "$RAW" --portal-json "$PJ"
+      --bucket "$BUCKET" --raw-prefix raw/ --workdir "$RAW" --portal-json "$PJ" "${LIM[@]}"
 fi
 
 if [ "$DO_CATALOG" = 1 ]; then
