@@ -10,7 +10,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 BUCKET=gastronet5m-lake-709569057971-euno1
 REGION=eu-north-1
-INSTANCE=i-060b69d04610f8fc1
 PORTAL_JSON="$HOME/.gastronet_portal/portal.json"
 LIMIT="${1:-60}"
 
@@ -20,11 +19,21 @@ aws sts get-caller-identity >/dev/null || { echo "no AWS creds -- export admin k
 
 echo "== 1/3  re-ship pipeline code (terraform re-uploads bootstrap/pipeline_src.zip) =="
 ( cd pipeline/infra && terraform apply -auto-approve -target=aws_s3_object.pipeline_src )
+INSTANCE=$(cd pipeline/infra && terraform output -raw ingest_instance_id)
+echo "   ingest instance: $INSTANCE"
 
 echo "== 2/3  upload portal session =="
 aws s3 cp "$PORTAL_JSON" "s3://$BUCKET/bootstrap/portal.json"
 
 echo "== 3/3  start ingest on $INSTANCE (limit=$LIMIT) =="
+echo "   waiting for SSM to register the instance..."
+for i in $(seq 1 40); do
+  st=$(aws ssm describe-instance-information --region "$REGION" \
+        --filters "Key=InstanceIds,Values=$INSTANCE" \
+        --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || true)
+  [ "$st" = "Online" ] && { echo "   SSM online"; break; }
+  sleep 15
+done
 read -r -d '' REMOTE <<EOF || true
 set -eux
 cd /opt/gastronet
