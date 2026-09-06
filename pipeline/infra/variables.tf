@@ -39,7 +39,9 @@ variable "ingest_instance_type" {
 
 variable "ingest_use_spot" {
   type    = bool
-  default = true
+  # on-demand by default: c7i.2xlarge spot in eu-north-1 was reclaimed twice in
+  # a few hours mid-project. On-demand is ~$0.40/hr and the box lives ~4h.
+  default = false
 }
 
 variable "ingest_root_gb" {

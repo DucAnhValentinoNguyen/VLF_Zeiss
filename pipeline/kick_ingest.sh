@@ -36,6 +36,7 @@ for i in $(seq 1 40); do
 done
 read -r -d '' REMOTE <<EOF || true
 set -eux
+for i in \$(seq 1 40); do [ -f /opt/gastronet/env.sh ] && break; echo "waiting for cloud-init..."; sleep 15; done
 cd /opt/gastronet
 aws s3 cp s3://$BUCKET/bootstrap/pipeline_src.zip pipeline_src.zip
 rm -rf src && unzip -oq pipeline_src.zip -d src
@@ -46,10 +47,12 @@ nohup bash \$PIPELINE_SRC/ingest/run_ingest.sh --ingest --catalog --curate --dq 
 echo "started pid \$!"
 EOF
 
+PARAMS=$(mktemp)
+python3 -c 'import json,sys; json.dump({"commands":[sys.stdin.read()],"executionTimeout":["172800"]}, open(sys.argv[1],"w"))' "$PARAMS" <<<"$REMOTE"
 CID=$(aws ssm send-command --region "$REGION" --instance-ids "$INSTANCE" \
-  --document-name AWS-RunShellScript \
-  --parameters "commands=[$(python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))' <<<"$REMOTE")]" \
+  --document-name AWS-RunShellScript --parameters "file://$PARAMS" \
   --query 'Command.CommandId' --output text)
+rm -f "$PARAMS"
 echo "SSM command: $CID"
 echo
 echo "watch it:"
