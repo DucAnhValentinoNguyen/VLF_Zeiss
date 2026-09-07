@@ -22,7 +22,7 @@ export PATH="$VIRTUAL_ENV/bin:$PATH"
 export DATA_ROOT="${DATA_ROOT:-$MCMLSCRATCH/zeiss_data}"
 export HKV_ROOT="${HKV_ROOT:-$DATA_ROOT}"
 export OUT_ROOT="${OUT_ROOT:-$HOME/vlf_zeiss_runs}"
-export GASTRONET_ROOT="${GASTRONET_ROOT:-$HOME/vlf_zeiss_data/gastronet5m}"
+export GASTRONET_ROOT="${GASTRONET_ROOT:-$MCMLSCRATCH/gastronet5m}"
 export REALCOLON_ROOT="${REALCOLON_ROOT:-$HOME/vlf_zeiss_data/real_colon}"
 mkdir -p "$OUT_ROOT" "$GASTRONET_ROOT" 2>/dev/null || true
 

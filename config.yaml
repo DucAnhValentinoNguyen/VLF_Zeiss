@@ -50,7 +50,7 @@ ssl:
   # Default = stream from the S3 lake with a local shard cache: epoch 1 fetches
   # each .tar over presigned HTTPS (one-time egress ~$5 for the curated tier),
   # every later epoch / job resubmit reads $GASTRONET_ROOT/.wds_cache instead.
-  gastronet_source: ${oc.env:GASTRONET_SOURCE,s3_webdataset}
+  gastronet_source: ${oc.env:GASTRONET_SOURCE,local_webdataset}
   gastronet_bucket: ${oc.env:GASTRONET_BUCKET,''}
   wds_cache_dir: ${oc.env:WDS_CACHE_DIR,${paths.gastronet}/.wds_cache}
   wds_cache_size_bytes: -1                 # -1 = unlimited (curated tier is ~50 GB)
