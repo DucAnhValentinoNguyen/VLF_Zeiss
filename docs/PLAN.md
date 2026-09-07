@@ -896,3 +896,27 @@ calibration.
 `bash lrz/submit_ssl_matrix.sh` (4 self-resubmitting runs). Then Phase 6:
 `submit_eval_chain.sh` picks up the `ema_backbone.pt`s and produces the
 16-row pre-vs-post delta table.
+
+### 2026-09-07 — Phase 5 launched
+
+EC2 ingest abandoned (instances vanish ~20 min post-create in this account,
+spot and on-demand alike). Pivoted to `pipeline/ingest/portal_to_wds.py` on an
+LRZ login node: portal presign -> stream zip -> curate (224 / phash-dedup /
+JPEG / WebDataset tar) -> delete zip. 60-zip subset done in 155 min ->
+**581,518 images, 60 shards, 8.1 GB** at
+`$MCMLSCRATCH/gastronet5m/webdataset/`. Downloads held ~90 MB/s to Hetzner.
+
+`gastronet_source` default reverted to `local_webdataset`; `GASTRONET_ROOT`
+default -> `$MCMLSCRATCH/gastronet5m`. `ssl.full.epochs` env-overridable
+(`SSL_EPOCHS`). `sbatch_ssl_pretrain.sbatch` runs the venv python directly (no
+`srun` — it dropped the sbatch env on this cluster).
+
+**SSL matrix queued** (jobs 5775945-48): LeJEPA/DINO x siglip2/imagenet,
+`STAGE=full SSL_EPOCHS=3`, self-resubmitting. ~4500 steps/epoch (581k / bs128).
+Then Phase 6: `submit_eval_chain.sh` picks up the 4 `ema_backbone.pt`s ->
+pre-vs-post calibration delta.
+
+AWS lake infra stays built + committed (Terraform, ingest/catalog/curate/dq,
+kick_ingest.sh) as the data-engineering artefact; this run just doesn't route
+through it. The ephemeral EC2 should be torn down
+(`terraform destroy -target=aws_instance.ingest`).
