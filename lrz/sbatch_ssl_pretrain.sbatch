@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=110G
-#SBATCH --time=12:00:00
+#SBATCH --time=06:00:00   # 3 epochs @ bs128 ~= LeJEPA <1h / DINO ~2h; short job backfills sooner, self-resubmits+resumes if it ever runs out
 #SBATCH --output=lrz/logs/%x_%j.out
 #SBATCH --error=lrz/logs/%x_%j.err
 #
