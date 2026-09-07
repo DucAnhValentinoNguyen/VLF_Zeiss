@@ -23,7 +23,9 @@ OUT_DIR="$OUT_ROOT/ssl/${OBJ}_${INIT}_${CORPUS}_${STAGE}"
 mkdir -p "$OUT_DIR"
 
 echo "[$(date)] SSL $OBJ/$INIT/$CORPUS/$STAGE  job=$SLURM_JOB_ID  -> $OUT_DIR"
-srun python -m vlfz.ssl.pretrain \
+# no srun: single-node single-GPU, and srun does not reliably carry the sbatch
+# env (SSL_EPOCHS / GASTRONET_SOURCE / venv PATH) onto the step on this cluster.
+"$VIRTUAL_ENV/bin/python" -m vlfz.ssl.pretrain \
   --objective "$OBJ" --init "$INIT" --stage "$STAGE" --corpus "$CORPUS" --resume \
   ${SSL_EXTRA:-}
 
