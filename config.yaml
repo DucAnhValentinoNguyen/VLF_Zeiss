@@ -71,7 +71,7 @@ ssl:
   ema_base: 0.9995                         # backbone weight-EMA (eval artefact)
   ckpt_every_steps: 500
   smoke: {epochs: 1, max_images: 2000, batch_size: 16, num_workers: 4}
-  full:  {epochs: 8, max_images: 0}        # 0 -> use ssl.subset_images
+  full:  {epochs: "${oc.env:SSL_EPOCHS,8}", max_images: 0}   # 0 -> use ssl.subset_images
 
   lejepa:
     proj_dim: 512
