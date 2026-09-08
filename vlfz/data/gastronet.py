@@ -186,7 +186,6 @@ def webdataset_loader(cfg, transform, collate, *, source, batch_size, num_worker
     file on the S3 *path*, so it's stable across presign regenerations) — epoch 1
     pays the S3 egress, every later epoch or job resubmit reads local disk."""
     import webdataset as wds
-    from torch.utils.data import DataLoader
 
     urls = webdataset_shards(cfg, source)
     cache_kw = {}
@@ -212,11 +211,17 @@ def webdataset_loader(cfg, transform, collate, *, source, batch_size, num_worker
         .shuffle(shuffle_buf)
         .map(_decode, handler=wds.warn_and_continue)
         .batched(batch_size, collation_fn=collate, partial=False)
-    ).with_epoch(steps_per_epoch)
+    )
 
-    dl = DataLoader(ds, batch_size=None, num_workers=num_workers,
-                    pin_memory=True, persistent_workers=(num_workers > 0))
-    return dl
+    # .with_epoch() has to bound the COMBINED stream, not the per-worker
+    # pipeline. With num_workers=N the whole dataset pipeline runs inside every
+    # worker, so ds.with_epoch(k) yields N*k batches per Lightning epoch (with
+    # N=12 that made "epoch 0" ~56k batches and no epoch-end / schedule / ckpt
+    # ever fired within the wall clock). WebLoader.with_epoch() is applied after
+    # the multiprocessing fan-in -> exactly steps_per_epoch batches per epoch.
+    dl = wds.WebLoader(ds, batch_size=None, num_workers=num_workers,
+                       pin_memory=True, persistent_workers=(num_workers > 0))
+    return dl.with_epoch(steps_per_epoch)
 
 
 def main():

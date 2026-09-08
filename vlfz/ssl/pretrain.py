@@ -270,15 +270,20 @@ class SSLModule(pl.LightningModule):
         self.manual_backward(loss)
         self.clip_gradients(opt, gradient_clip_val=float(cfg.ssl.grad_clip),
                             gradient_clip_algorithm="norm")
-        # opt.optimizer.step() (the raw torch.optim.AdamW.step()) instead of
-        # opt.step() (LightningOptimizer -> Strategy.optimizer_step): see
-        # docs/PLAN.md debugging notes -- an intermittent CPU-only hang was
-        # observed around the optimizer step on this shared login node, not
-        # reproduced with any single fix in isolation. This bypass, plus
-        # foreach=False (configure_optimizers) and single-threaded CPU runs
-        # (train(), below), are defense-in-depth; the actual training target
-        # is always a dedicated GPU node via sbatch, not this login node.
-        opt.optimizer.step()
+        # GPU (the real training target): the normal LightningOptimizer step, so
+        # trainer.global_step advances. The LR / teacher-temp / EMA-momentum
+        # schedules AND ModelCheckpoint(every_n_train_steps) all key off
+        # global_step; the raw opt.optimizer.step() below leaves it pinned at 0
+        # -> LR frozen at 0 -> the model never trains and no checkpoint fires.
+        # Keep the raw-step bypass ONLY for CPU login-node smokes, where an
+        # intermittent post-backward hang in the LightningOptimizer step path
+        # was seen (docs/PLAN.md) and never reproduced on GPU; foreach=False
+        # (configure_optimizers) + single-thread (train()) are the other
+        # CPU-only guards.
+        if torch.cuda.is_available():
+            opt.step()
+        else:
+            opt.optimizer.step()
         opt.zero_grad(set_to_none=True)
 
         if self.ema_bb is not None:
