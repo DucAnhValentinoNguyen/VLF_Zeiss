@@ -408,7 +408,13 @@ def train(cfg, args):
     trainer = pl.Trainer(
         accelerator=("gpu" if dev == "cuda" else "cpu"), devices=1,
         precision=("bf16-mixed" if dev == "cuda" else 32),
-        max_epochs=epochs, max_steps=(args.limit_steps or -1),
+        # bound on absolute global_step, not epochs: on resume from last.ckpt
+        # Lightning restores global_step but its iterable-dataloader epoch counter
+        # resets, so `max_epochs` would run a FRESH `epochs` epochs after a resume
+        # (a run that TIMEOUT'd at 1 epoch then resumed did ~4 epochs total).
+        # max_steps=total_steps makes "3 epochs" mean 3*steps_per_epoch of training
+        # regardless of how many allocations it took.
+        max_epochs=-1, max_steps=(args.limit_steps or total_steps),
         default_root_dir=out_dir, callbacks=[ckpt_cb],
         logger=pl.loggers.TensorBoardLogger(out_dir, name="tb"),
         enable_progress_bar=True, log_every_n_steps=50,
