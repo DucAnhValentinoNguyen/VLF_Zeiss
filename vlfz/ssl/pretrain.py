@@ -155,12 +155,21 @@ def _hparams(cfg, args, **rt) -> dict:
     """Everything worth having in one place: the resolved runtime numbers plus
     every optim / schedule / backbone / aug / objective hyperparameter."""
     s, b, a = cfg.ssl, cfg.backbones, cfg.aug
+    gpu = gpu_vram = gpu_count = None
+    try:
+        if torch.cuda.is_available():
+            p = torch.cuda.get_device_properties(0)
+            gpu, gpu_vram, gpu_count = p.name, round(p.total_memory / 2**30, 1), torch.cuda.device_count()
+    except Exception:  # noqa: BLE001
+        pass
     hp = {
         "objective": args.objective, "init": args.init, "corpus": args.corpus,
         "stage": args.stage, "source": (args.source or ""), "lora": bool(args.lora),
         "seed": int(cfg.seed), "git_sha": git_sha(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID", ""),
-        "node": os.environ.get("SLURMD_NODENAME", ""),
+        "node": os.environ.get("SLURMD_NODENAME", "") or os.environ.get("SLURM_JOB_NODELIST", ""),
+        "partition": os.environ.get("SLURM_JOB_PARTITION", ""),
+        "gpu": gpu, "gpu_count": gpu_count, "gpu_vram_gb": gpu_vram,
         **rt,
         "grad_accum": int(s.grad_accum),
         "base_lr": float(s.base_lr), "min_lr": float(s.min_lr),

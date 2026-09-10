@@ -30,12 +30,14 @@ def collect(results_dir: str) -> pd.DataFrame:
             continue
         if "rows" not in d:
             continue
-        gitsha = d.get("provenance", {}).get("git_sha", "")
-        ts = d.get("provenance", {}).get("timestamp", "")
+        prov = d.get("provenance", {})
         for r in d["rows"]:
             rec = {c: r.get(c) for c in _ROW_COLS}
-            rec["git_sha"] = gitsha
-            rec["timestamp"] = ts
+            rec["git_sha"] = prov.get("git_sha", "")
+            rec["timestamp"] = prov.get("timestamp", "")
+            rec["node"] = prov.get("slurm_nodelist", "")
+            rec["gpu"] = prov.get("gpu", "")
+            rec["gpu_vram_gb"] = prov.get("gpu_vram_gb", "")
             rec["source"] = os.path.basename(fp)
             recs.append(rec)
     return pd.DataFrame.from_records(recs)

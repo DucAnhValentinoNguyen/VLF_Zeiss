@@ -59,11 +59,16 @@ def git_sha(repo: str | os.PathLike | None = None) -> str:
 
 def provenance(seed: int, **extra: Any) -> dict:
     """Reproducibility stamp embedded in every results JSON."""
+    cuda, gpu, gpu_count, gpu_vram_gb = "cpu", "cpu", 0, 0.0
     try:
         import torch
 
-        cuda = torch.version.cuda if torch.cuda.is_available() else "cpu"
-        gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            p = torch.cuda.get_device_properties(0)
+            cuda = torch.version.cuda
+            gpu = p.name                                   # e.g. "NVIDIA H100 94GB" / "NVIDIA A100-SXM4-80GB"
+            gpu_count = torch.cuda.device_count()          # visible to this job (--gres=gpu:N)
+            gpu_vram_gb = round(p.total_memory / 2**30, 1)
     except Exception:
         cuda, gpu = "n/a", "n/a"
     out = {
@@ -77,7 +82,11 @@ def provenance(seed: int, **extra: Any) -> dict:
         "sklearn": _pkg_version("sklearn"),
         "cuda": cuda,
         "gpu": gpu,
+        "gpu_count": gpu_count,
+        "gpu_vram_gb": gpu_vram_gb,
         "slurm_job_id": os.environ.get("SLURM_JOB_ID", ""),
+        "slurm_partition": os.environ.get("SLURM_JOB_PARTITION", ""),
+        "slurm_nodelist": os.environ.get("SLURM_JOB_NODELIST", ""),
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     out.update(extra)

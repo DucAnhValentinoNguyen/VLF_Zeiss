@@ -34,7 +34,7 @@ def _suspect(row) -> str:
 
 def _table(df: pd.DataFrame) -> str:
     cols = ["dataset", "init", "objective", "corpus", "stage", "task", "protocol",
-            "temp_scaled", *_PRIMARY, "dice", "miou", *_CONTEXT]
+            "temp_scaled", *_PRIMARY, "dice", "miou", *_CONTEXT, "node"]
     cols = [c for c in cols if c in df.columns]
     df = df.sort_values([c for c in ["dataset", "task", "protocol", "init", "objective",
                                      "stage", "temp_scaled"] if c in df.columns])
