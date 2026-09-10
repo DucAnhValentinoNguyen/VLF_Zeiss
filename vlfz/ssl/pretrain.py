@@ -425,6 +425,18 @@ def train(cfg, args):
     if not model._limit_hit:
         open(done_flag, "w").write(__import__("time").strftime("%Y-%m-%d %H:%M:%S\n"))
         print(f"[pretrain] DONE -> {out_dir}/ema_backbone.pt")
+        # Reclaim the resume/periodic checkpoints (~1.4 GB each) now that the run
+        # is finished -- eval only ever loads ema_backbone.pt. Four runs each
+        # leaving last.ckpt + ckpt-step=*.ckpt filled the home quota and killed
+        # a resume mid-checkpoint (OSError 28). Keep ema_backbone.pt + tb/ + DONE.
+        import glob as _glob
+
+        for _f in [os.path.join(out_dir, "last.ckpt"), *_glob.glob(os.path.join(out_dir, "ckpt-*.ckpt"))]:
+            try:
+                os.remove(_f)
+                print(f"[pretrain] cleaned {os.path.basename(_f)}")
+            except OSError:
+                pass
     return out_dir
 
 
