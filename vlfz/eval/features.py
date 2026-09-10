@@ -12,6 +12,7 @@ predict-only, one-batch-of-hooks LightningModule; no gradients, no checkpoints.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 
 import lightning.pytorch as pl
@@ -104,4 +105,18 @@ def extract_features(
         ys[idx] = yb.numpy()
     feats = np.nan_to_num(feats, nan=0.0, posinf=0.0, neginf=0.0)
     np.savez(path, X=feats, y=ys)
+    # sidecar so storage_report / anyone can attribute this .npz to its task.
+    # backbone_tag is "<tag>|<dataset>|<task>|<split>" (run_eval builds it).
+    try:
+        parts = backbone_tag.split("|")
+        json.dump({"tag": parts[0],
+                   "dataset": parts[1] if len(parts) > 1 else "",
+                   "task": parts[2] if len(parts) > 2 else "",
+                   "split": parts[3] if len(parts) > 3 else "",
+                   "n": int(len(samples)), "dim": int(backbone.embed_dim),
+                   "bytes": int(os.path.getsize(path)),
+                   "img_size": int(cfg.eval.img_size)},
+                  open(path[:-4] + ".json", "w"))
+    except Exception:  # noqa: BLE001
+        pass
     return {"X": feats, "y": ys, "cache": path, "hit": False}
