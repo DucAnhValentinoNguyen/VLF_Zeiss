@@ -18,13 +18,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 
 import lightning.pytorch as pl
 import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from ..cfg import ensure_dirs, load_cfg, provenance, set_seed
+from ..cfg import ensure_dirs, git_sha, load_cfg, provenance, set_seed
 from ..models.ema import EMA, cosine_momentum
 from ..models.heads import DINOHead, Predictor, Projector
 from ..models.vit_backbone import build_vit_b16
@@ -148,6 +149,75 @@ def llrd_param_groups(backbone, other_params, base_lr, decay):
          if n.startswith(("norm", "fc_norm", "head", "attn_pool"))], 1.0)
     add(backbone.trunk.parameters(), decay ** (depth + 1))  # any stragglers
     return groups
+
+
+def _hparams(cfg, args, **rt) -> dict:
+    """Everything worth having in one place: the resolved runtime numbers plus
+    every optim / schedule / backbone / aug / objective hyperparameter."""
+    s, b, a = cfg.ssl, cfg.backbones, cfg.aug
+    hp = {
+        "objective": args.objective, "init": args.init, "corpus": args.corpus,
+        "stage": args.stage, "source": (args.source or ""), "lora": bool(args.lora),
+        "seed": int(cfg.seed), "git_sha": git_sha(),
+        "slurm_job_id": os.environ.get("SLURM_JOB_ID", ""),
+        "node": os.environ.get("SLURMD_NODENAME", ""),
+        **rt,
+        "grad_accum": int(s.grad_accum),
+        "base_lr": float(s.base_lr), "min_lr": float(s.min_lr),
+        "weight_decay": float(s.weight_decay), "warmup_frac": float(s.warmup_frac),
+        "llrd": float(s.llrd), "grad_clip": float(s.grad_clip),
+        "ema_base": float(s.ema_base), "ckpt_every_steps": int(s.ckpt_every_steps),
+        "arch": str(b.arch), "img_size": int(b.img_size),
+        "norm_mean": list(b.norm_mean), "norm_std": list(b.norm_std),
+        "rrc_scale": list(a.rrc_scale), "rotation_deg": float(a.rotation_deg),
+        "color_jitter": list(a.color_jitter), "blur_p": float(a.blur_p),
+    }
+    if args.objective == "lejepa":
+        lp = s.lejepa
+        hp.update({f"lejepa.{k}": v for k, v in dict(
+            proj_dim=int(lp.proj_dim), pred_hidden_mult=int(lp.pred_hidden_mult),
+            sigreg_lambda=float(lp.sigreg_lambda), var_weight=float(lp.var_weight),
+            sigreg_slices=int(lp.sigreg_slices), sigreg_freqs=int(lp.sigreg_freqs),
+        ).items()})
+    else:
+        dp = s.dino
+        hp.update({f"dino.{k}": v for k, v in dict(
+            out_dim=int(dp.out_dim), n_local=int(dp.n_local),
+            global_scale=list(dp.global_scale), local_scale=list(dp.local_scale),
+            student_temp=float(dp.student_temp), teacher_temp=float(dp.teacher_temp),
+            teacher_temp_final=float(dp.teacher_temp_final),
+            teacher_temp_warmup_frac=float(dp.teacher_temp_warmup_frac),
+            center_momentum=float(dp.center_momentum),
+        ).items()})
+    return hp
+
+
+def _wandb_logger(cfg, args, out_dir):
+    """A WandbLogger when W&B is configured (a WANDB_API_KEY in the env, or
+    cfg.wandb.enabled), else None. The run id is derived from out_dir so a SLURM
+    resubmit resumes the SAME W&B run instead of starting a new one."""
+    wcfg = getattr(cfg, "wandb", None)
+    on = bool(os.environ.get("WANDB_API_KEY")) or bool(getattr(wcfg, "enabled", False))
+    if not on or os.environ.get("WANDB_MODE") == "disabled":
+        return None
+    try:
+        import hashlib
+
+        import wandb  # noqa: F401  (Lightning's WandbLogger re-checks for it)
+        from lightning.pytorch.loggers import WandbLogger
+
+        ent = os.environ.get("WANDB_ENTITY") or str(getattr(wcfg, "entity", "")) or None
+        proj = os.environ.get("WANDB_PROJECT") or str(getattr(wcfg, "project", "vlf-zeiss"))
+        return WandbLogger(
+            project=proj, entity=ent,
+            name=f"{args.objective}_{args.init}_{args.corpus}_{args.stage}",
+            id=hashlib.md5(out_dir.encode()).hexdigest()[:16], resume="allow",
+            save_dir=os.environ.get("WANDB_DIR", out_dir),
+            tags=[args.objective, args.init, args.corpus, args.stage],
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"[pretrain] wandb requested but unavailable ({e}); TensorBoard only")
+        return None
 
 
 def _maybe_lora(backbone):
@@ -309,14 +379,26 @@ class SSLModule(pl.LightningModule):
 
         return loss
 
+    def on_train_epoch_start(self):
+        self._ep_t0 = time.time()
+        self._ep_step0 = self.global_step
+
     def on_train_epoch_end(self):
+        dt = time.time() - getattr(self, "_ep_t0", time.time())
+        nst = max(1, self.global_step - getattr(self, "_ep_step0", 0))
+        ips = nst / max(dt, 1e-6)
+        self.log("time/epoch_min", dt / 60.0, on_epoch=True, rank_zero_only=True)
+        self.log("perf/it_per_sec", ips, on_epoch=True, rank_zero_only=True)
+        self.log("perf/img_per_sec", ips * int(self.cfg.ssl.batch_size),
+                 on_epoch=True, rank_zero_only=True)
         try:
             self.backbone.eval()
             with torch.no_grad():
                 probe = next(iter(self.trainer.train_dataloader))
                 v = probe[0][:64].to(self.device)
                 er = effective_rank(self.backbone.feature(v))
-            print(f"epoch {self.current_epoch + 1} done  eff_rank {er:.1f}")
+            print(f"epoch {self.current_epoch + 1} done  eff_rank {er:.1f}  "
+                  f"({dt / 60:.1f} min, {ips:.2f} it/s)")
             self.log("collapse/effective_rank", er, on_epoch=True)
         except Exception as e:  # noqa: BLE001
             print(f"epoch {self.current_epoch + 1} done  (eff_rank skipped: {e})")
@@ -405,6 +487,27 @@ def train(cfg, args):
     ckpt_cb = ModelCheckpoint(dirpath=out_dir, filename="ckpt-{step}",
                               every_n_train_steps=int(cfg.ssl.ckpt_every_steps),
                               save_last=True, save_top_k=1)
+
+    # loggers: TensorBoard always, W&B when configured (see _wandb_logger).
+    loggers = [pl.loggers.TensorBoardLogger(out_dir, name="tb")]
+    wb = _wandb_logger(cfg, args, out_dir)
+    if wb is not None:
+        loggers.append(wb)
+    hp = _hparams(cfg, args, bs=bs, num_workers=nw, epochs=epochs,
+                  steps_per_epoch=steps_per_epoch, total_steps=total_steps,
+                  device=dev, precision=("bf16-mixed" if dev == "cuda" else "32"),
+                  resumed=bool(resume_from))
+    for lg in loggers:
+        try:
+            lg.log_hyperparams(hp)
+        except Exception:  # noqa: BLE001
+            pass
+    if wb is not None:
+        try:
+            print(f"[pretrain] wandb run: {wb.experiment.url}")
+        except Exception:  # noqa: BLE001 (offline / no url)
+            print("[pretrain] wandb logging enabled")
+
     trainer = pl.Trainer(
         accelerator=("gpu" if dev == "cuda" else "cpu"), devices=1,
         precision=("bf16-mixed" if dev == "cuda" else 32),
@@ -415,8 +518,7 @@ def train(cfg, args):
         # max_steps=total_steps makes "3 epochs" mean 3*steps_per_epoch of training
         # regardless of how many allocations it took.
         max_epochs=-1, max_steps=(args.limit_steps or total_steps),
-        default_root_dir=out_dir, callbacks=[ckpt_cb],
-        logger=pl.loggers.TensorBoardLogger(out_dir, name="tb"),
+        default_root_dir=out_dir, callbacks=[ckpt_cb], logger=loggers,
         enable_progress_bar=True, log_every_n_steps=50,
         num_sanity_val_steps=0,
     )

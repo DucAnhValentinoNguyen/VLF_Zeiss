@@ -133,4 +133,13 @@ calibration:
   adaptive_bins: 15
   temp_max_iter: 100
 
+# Weights & Biases. Opt-in: any WANDB_API_KEY in the environment turns it on
+# (lrz/job_env.sh exports it from ~/.wandb_key). Run dirs + cache go on
+# $MCMLSCRATCH via WANDB_DIR (never the home quota). Set WANDB_MODE=offline on a
+# firewalled node and `wandb sync $MCMLSCRATCH/wandb` from the login node after.
+wandb:
+  enabled: ${oc.env:WANDB_ENABLED,false}     # force-on without a key (e.g. offline)
+  project: ${oc.env:WANDB_PROJECT,vlf-zeiss}
+  entity:  ${oc.env:WANDB_ENTITY,''}          # '' -> the key's default (personal) entity
+
 seed: 0

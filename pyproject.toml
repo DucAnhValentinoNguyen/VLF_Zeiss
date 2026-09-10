@@ -24,6 +24,7 @@ dependencies = [
     # see pipeline/) -> boto3 + webdataset are on the default SSL training path.
     "boto3>=1.34",
     "webdataset>=0.2.86,<1.1",
+    "wandb>=0.16",              # SSL/eval run logging (opt-in via WANDB_API_KEY)
 ]
 
 [project.optional-dependencies]
