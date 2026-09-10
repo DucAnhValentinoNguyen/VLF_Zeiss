@@ -17,11 +17,13 @@ mkdir -p "$UV_CACHE_DIR" "$XDG_CACHE_HOME" "$HF_HOME" 2>/dev/null || true
 export VIRTUAL_ENV="${VIRTUAL_ENV:-$VLF_ROOT/.venv}"
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# --- data: HyperKvasir is staged read-only on scratch; outputs go on the home
-#     quota because the DSS project scratch container is full. ---
+# --- data: HyperKvasir is staged read-only on scratch. Outputs live on
+#     $MCMLSCRATCH, NOT the home quota: the home quota hit its ceiling and killed
+#     an SSL resume mid-checkpoint (OSError 28, 2026-09-10). ~/vlf_zeiss_runs is
+#     kept as a symlink to the scratch dir so older hardcoded paths still resolve.
 export DATA_ROOT="${DATA_ROOT:-$MCMLSCRATCH/zeiss_data}"
 export HKV_ROOT="${HKV_ROOT:-$DATA_ROOT}"
-export OUT_ROOT="${OUT_ROOT:-$HOME/vlf_zeiss_runs}"
+export OUT_ROOT="${OUT_ROOT:-$MCMLSCRATCH/vlf_zeiss_runs}"
 export GASTRONET_ROOT="${GASTRONET_ROOT:-$MCMLSCRATCH/gastronet5m}"
 export REALCOLON_ROOT="${REALCOLON_ROOT:-$HOME/vlf_zeiss_data/real_colon}"
 mkdir -p "$OUT_ROOT" "$GASTRONET_ROOT" 2>/dev/null || true
@@ -41,6 +43,17 @@ export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-eu-north-1}"
   export GASTRONET_BUCKET="$(cat "$HOME/.gastronet_bucket")"
 export GASTRONET_SOURCE="${GASTRONET_SOURCE:-local_webdataset}"
 export PATH="$HOME/bin:$PATH"
+
+# --- Weights & Biases (opt-in; key in ~/.wandb_key chmod 600, never committed) ---
+# Run dirs go on scratch, NEVER the home quota.
+[ -z "${WANDB_API_KEY:-}" ] && [ -f "$HOME/.wandb_key" ] && \
+  export WANDB_API_KEY="$(cat "$HOME/.wandb_key")"
+export WANDB_PROJECT="${WANDB_PROJECT:-vlf-zeiss}"
+export WANDB_ENTITY="${WANDB_ENTITY:-}"        # empty -> the key's default (personal) entity
+export WANDB_DIR="${WANDB_DIR:-$MCMLSCRATCH/wandb}"
+export WANDB_CACHE_DIR="${WANDB_CACHE_DIR:-$MCMLSCRATCH/wandb/.cache}"
+export WANDB_MODE="${WANDB_MODE:-online}"      # 'offline' -> sync later with `wandb sync`
+mkdir -p "$WANDB_DIR" 2>/dev/null || true
 
 # Robust GPU readiness check: torch.cuda.is_available() can transiently return False
 # right after allocation on a busy shared node (NVML init race). Usage: wait_for_gpu || exit 1

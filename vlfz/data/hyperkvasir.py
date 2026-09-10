@@ -108,18 +108,81 @@ def _task_label(lab: dict, task: str):
     raise KeyError(task)
 
 
-def global_split(cfg, *, force: bool = False) -> dict[str, list[str]]:
-    """One stratified (on 23-way finding) image-level 3-way split, cached.
-    NOTE: HyperKvasir's image-labels.csv has no patient/procedure id, so this is
-    image-level; near-duplicate procedure frames may span splits (recorded as a
-    caveat in every results JSON)."""
+def _phash_table(cfg, *, force: bool = False) -> dict[str, int]:
+    """stem -> 64-bit perceptual hash (as int), for every labelled image. Cached
+    to hkv_phash.json (~10.6k rows, one full decode pass -- minutes on a login
+    node, then reused)."""
     cache = os.path.abspath(os.path.expanduser(str(cfg.paths.cache)))
     os.makedirs(cache, exist_ok=True)
-    fp = os.path.join(cache, "hkv_splits.json")
+    fp = os.path.join(cache, "hkv_phash.json")
+    if os.path.exists(fp) and not force:
+        return {k: int(v, 16) for k, v in json.load(open(fp)).items()}
+
+    import imagehash
+    from PIL import Image
+
+    out: dict[str, str] = {}
+    imgs = scan_labeled_images(cfg)
+    for i, (p, _) in enumerate(imgs):
+        stem = os.path.splitext(os.path.basename(p))[0]
+        try:
+            out[stem] = str(imagehash.phash(Image.open(p).convert("RGB")))
+        except Exception:
+            continue
+        if (i + 1) % 2000 == 0:
+            print(f"[hkv] phash {i + 1}/{len(imgs)}")
+    json.dump(out, open(fp, "w"))
+    print(f"[hkv] phash -> {fp}  ({len(out)} images)")
+    return {k: int(v, 16) for k, v in out.items()}
+
+
+_POPCOUNT = None
+
+
+def _near_reference(query_stems: list[str], ref_stems: list[str],
+                    ph: dict[str, int], max_dist: int) -> set[str]:
+    """Subset of query_stems whose phash is within `max_dist` bits of ANY
+    reference stem's phash (vectorised Hamming over packed uint64)."""
+    import numpy as np
+
+    global _POPCOUNT
+    if _POPCOUNT is None:
+        _POPCOUNT = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
+
+    q = [(s, ph[s]) for s in query_stems if s in ph]
+    r = np.array([ph[s] for s in ref_stems if s in ph], dtype=np.uint64)
+    if not q or not r.size:
+        return set()
+    qh = np.array([h for _, h in q], dtype=np.uint64)
+    hit: set[str] = set()
+    CH = 512  # query chunk; keeps the XOR matrix small
+    for i in range(0, len(qh), CH):
+        xor = np.bitwise_xor(qh[i:i + CH][:, None], r[None, :])          # (c, R) uint64
+        dist = _POPCOUNT[xor.view(np.uint8)].reshape(xor.shape[0], r.size, 8).sum(2)
+        near = dist.min(axis=1) <= max_dist
+        for j in np.nonzero(near)[0]:
+            hit.add(q[i + int(j)][0])
+    return hit
+
+
+def global_split(cfg, *, force: bool = False) -> dict[str, list[str]]:
+    """One stratified (on 23-way finding) image-level 3-way split, cached.
+
+    HyperKvasir's image-labels.csv has no patient/procedure id, so the base split
+    is image-level. With ``cfg.hyperkvasir.split.phash_dedup`` on, every cal/query
+    image that is a perceptual near-duplicate (<= ``phash_max_dist`` bits) of a
+    reference image is dropped before scoring -- the leakage mitigation for
+    near-duplicate procedure frames straddling splits. Deduped splits cache to
+    a distinct file so toggling the flag never reuses a stale split."""
+    cache = os.path.abspath(os.path.expanduser(str(cfg.paths.cache)))
+    os.makedirs(cache, exist_ok=True)
+    hp = cfg.hyperkvasir.split
+    dedup = bool(getattr(hp, "phash_dedup", False))
+    max_dist = int(getattr(hp, "phash_max_dist", 6))
+    fp = os.path.join(cache, f"hkv_splits_dd{max_dist}.json" if dedup else "hkv_splits.json")
     if os.path.exists(fp) and not force:
         return json.load(open(fp))
 
-    hp = cfg.hyperkvasir.split
     r_ref, r_cal = float(hp.ref_frac), float(hp.cal_frac)
     rng = random.Random(int(hp.seed))
     by_cls: dict[str, list[str]] = defaultdict(list)
@@ -136,6 +199,18 @@ def global_split(cfg, *, force: bool = False) -> dict[str, list[str]]:
         parts["cal"] += stems[n_ref:n_ref + n_cal]
         parts["query"] += stems[n_ref + n_cal:]
     parts = {k: sorted(v) for k, v in parts.items()}
+
+    if dedup:
+        ph = _phash_table(cfg)
+        ref = parts["reference"]
+        before = {k: len(v) for k, v in parts.items()}
+        for split in ("cal", "query"):
+            drop = _near_reference(parts[split], ref, ph, max_dist)
+            parts[split] = sorted(s for s in parts[split] if s not in drop)
+        dropped = {k: before[k] - len(parts[k]) for k in ("cal", "query")}
+        print(f"[hkv] phash dedup (<= {max_dist} bits vs reference): "
+              f"dropped cal={dropped['cal']} query={dropped['query']}")
+
     json.dump(parts, open(fp, "w"), indent=2)
     print(f"[hkv] split -> {fp}  " + " ".join(f"{k}={len(v)}" for k, v in parts.items()))
     return parts

@@ -38,3 +38,7 @@ pipeline/**/portal.json
 pipeline/**/urls.txt
 shard_list.txt
 .gastronet_bucket
+
+# W&B (key is in ~/.wandb_key, never here)
+.wandb_key
+wandb/
