@@ -108,6 +108,12 @@ hyperkvasir:
     ref_frac: 0.60        # k-NN support
     cal_frac: 0.15        # temperature / evidence-scale fit
     # remainder (~0.25) -> query (held-out test)
+    # leakage mitigation: HyperKvasir has no procedure id, so near-duplicate
+    # frames can straddle splits. Drop every cal/query image within
+    # phash_max_dist bits of ANY reference image before scoring. Deduped splits
+    # cache to hkv_splits_dd<N>.json (raw split untouched).
+    phash_dedup: true
+    phash_max_dist: 6
   seg:
     n_support: 100        # labelled polyp masks used as the k-NN dense-label support set
     patch_k: 10
