@@ -1,7 +1,7 @@
 # VLF_Zeiss
 
 Zero-shot **calibration** (ECE / NLL) of self-supervised vision foundation models
-on **REAL-Colon**, measured **before vs after** in-domain SSL pretraining on
+on **HyperKvasir**, measured **before vs after** in-domain SSL pretraining on
 **GastroNet-5M**.
 
 Independent repo — its own venv (`.venv`), its own code. No dependency on any
