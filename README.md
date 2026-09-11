@@ -55,7 +55,6 @@ vlfz/
            pretrain.py        Lightning SSLModule + GastroNetDataModule (--objective/--init/--stage)
   data/    gastronet.py       zip-shard (local) + curated WebDataset (local/S3-streamed+cached) reader
            hyperkvasir.py     HyperKvasir tasks + splits ; registry.py dataset dispatch
-           realcolon.py       (kept, unused — REAL-Colon dropped for storage)
            transforms.py folds.py
   eval/    features.py        cached frozen-feature extraction via Lightning Trainer.predict()
            knn.py             weighted k-NN -> probs / logits / vote_mass
@@ -74,7 +73,7 @@ tests/     unit tests + smoke_eval.sh / smoke_ssl.sh
 
 ```bash
 bash lrz/setup_env.sh          # creates .venv: pinned torch 2.5.1+cu121 + lightning + webdataset/boto3
-source lrz/job_env.sh          # exports DATA_ROOT / HKV_ROOT / OUT_ROOT(home) / AWS_PROFILE / venv
+source lrz/job_env.sh          # exports DATA_ROOT / HKV_ROOT / OUT_ROOT / AWS_PROFILE / venv
 python -m pytest -q            # unit tests
 bash tests/smoke_eval.sh       # full pipeline on a small HyperKvasir subset (CPU)
 bash tests/smoke_ssl.sh        # LeJEPA SSL smoke, self-contained (fabricates tiny images if needed)
@@ -83,8 +82,17 @@ python -m vlfz.data.hyperkvasir --inspect --make-splits
 
 ## Data
 
-**HyperKvasir** (eval) is already staged read-only under `$HKV_ROOT`
-(`/dss/dssmcmlfs01/pr74ze/pr74ze-dss-0001/ra82sat2/zeiss_data`).
+**HyperKvasir** (evaluation & zero-shot calibration benchmark) is staged read-only under `$HKV_ROOT`
+(`/dss/dssmcmlfs01/pr74ze/pr74ze-dss-0001/ra82sat2/zeiss_data`), serving as the primary evaluation dataset.
+
+Layout under `$HKV_ROOT`:
+- `hyper_kvasir_labeled_images/`: 10,662 labeled endoscopy images across upper and lower GI findings (`image-labels.csv`).
+- `hyper_kvasir_segmented_images/`: 1,000 polyp images with ground-truth segmentation masks (`hkv_seg`).
+- `hyper_kvasir_unlabeled_images/`: ~99k unlabeled images (`images/*.jpg`), usable as a local fallback SSL corpus (`--corpus hkv_unlabeled`).
+
+**Splits & Cross-Split Deduplication:**
+- Stratified image-level split (reference / cal / query = 60% / 15% / 25%) shared across all classification tasks.
+- Perceptual hash deduplication (`imagehash.phash`, Hamming distance ≤ 6 bits) filters out cal and query frames that are near-duplicates of reference images, preventing cross-split video frame leakage.
 
 **GastroNet-5M** (SSL corpus) lives in an AWS S3 lake, built once from
 `pipeline/` (Terraform + an ephemeral ingest/curation EC2 — see
@@ -127,9 +135,10 @@ cat "$OUT_ROOT/results/report.md"
   not absolute values; a k-sensitivity sweep (k ∈ {10,20,50,200}) is recorded.
 - **Domain gap**: GastroNet-5M is upper-GI-weighted; HyperKvasir spans upper+lower
   GI. Expect the SSL lift to vary by task (largest on fine-grained `hkv_findings`).
-- **Image-level split** — HyperKvasir's `image-labels.csv` has no patient id, so
-  near-duplicate procedure frames may span splits (`SUSPECT ⚠` flag + a note in
-  every results JSON). Storage lives on the home quota (DSS scratch is full).
+- **Image-level split & pHash dedup** — HyperKvasir's `image-labels.csv` has no patient id,
+  so near-duplicate procedure frames across splits are pruned via perceptual hashing
+  (Hamming distance ≤ 6 bits). Outputs and run artifacts are placed on `$MCMLSCRATCH`
+  to ensure ample disk space.
 - DINO's EMA teacher is a deepcopy of a ViT-B → 2× in RAM; DINO SSL needs a GPU
   node, not a login node. LeJEPA is lighter. (Unchanged by the Lightning move —
   it's inherent to the algorithm, not the training-loop implementation.)

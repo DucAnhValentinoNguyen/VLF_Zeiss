@@ -29,8 +29,8 @@ LRZ's ~90 GB of writable quota.
 **Design rule:** the bucket is the durable lake; LRZ gets the curated tier **once**
 and every training epoch reads local disk. No per-epoch S3 reads — that would be
 hundreds of dollars of egress. A `s3_webdataset` streaming mode exists
-(`vlfz/data/gastronet.py`) for when the curated tier outgrows local disk (e.g.
-after REAL-Colon is added), with the per-pass egress cost called out.
+(`vlfz/data/gastronet.py`) for when the curated tier outgrows local disk, with
+the per-pass egress cost called out.
 
 ## Layout
 
@@ -101,9 +101,9 @@ CORPUS=gastronet GASTRONET_SOURCE=local_webdataset bash lrz/submit_ssl_matrix.sh
 Well inside the $100 AWS credit. `terraform destroy` (or `make destroy-all`)
 returns to zero. AWS Budgets emails at 40 % and 100 % of the monthly cap.
 
-## Adding REAL-Colon later
+## Adding additional datasets later
 
-Point `ingest/portal_to_s3.py` at the Figshare tarballs (`--url-list`), reuse
+Point `ingest/portal_to_s3.py` at raw archives (`--url-list`), reuse
 `build_manifest.py` / `curate_shard.py` unchanged (they are format-agnostic over
 `raw/*.zip|*.tar`), and either stage a curated subset or switch that corpus to
 `s3_webdataset`.

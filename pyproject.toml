@@ -1,7 +1,7 @@
 [project]
 name = "vlfz"
 version = "0.1.0"
-description = "Zero-shot calibration (ECE / NLL) of SSL vision foundation models on REAL-Colon, before vs after SSL pretraining on GastroNet-5M."
+description = "Zero-shot calibration (ECE / NLL) of SSL vision foundation models on HyperKvasir, before vs after SSL pretraining on GastroNet-5M."
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "torch==2.5.1",
