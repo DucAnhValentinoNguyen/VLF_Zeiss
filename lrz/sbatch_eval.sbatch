@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=96G
-#SBATCH --time=03:00:00
+#SBATCH --time=00:30:00   # observed ~4-5 min/setting (mostly cached features); 3h was killing backfill on a loaded queue
 #SBATCH --output=lrz/logs/%x_%j.out
 #SBATCH --error=lrz/logs/%x_%j.err
 #
