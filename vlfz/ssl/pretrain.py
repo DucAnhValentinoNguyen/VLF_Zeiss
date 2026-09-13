@@ -29,6 +29,7 @@ from ..cfg import ensure_dirs, git_sha, load_cfg, provenance, set_seed
 from ..models.ema import EMA, cosine_momentum
 from ..models.heads import DINOHead, Predictor, Projector
 from ..models.vit_backbone import build_vit_b16
+from ..run_paths import ssl_dir
 from .dino_lib import cosine_lr, dino_loss, teacher_temp_at, update_center
 from .lejepa_lib import effective_rank, lejepa_loss
 
@@ -422,7 +423,7 @@ class SSLModule(pl.LightningModule):
         torch.save(
             {"ema_backbone": trunk.state_dict(), "init": self.args.init,
              "objective": self.args.objective, "corpus": self.args.corpus,
-             "gstep": self.global_step,
+             "gstep": self.global_step, "run_tag": getattr(self.args, "run_tag", ""),
              "provenance": provenance(int(self.cfg.seed), objective=self.args.objective,
                                       init=self.args.init, corpus=self.args.corpus)},
             os.path.join(self.out_dir, "ema_backbone.pt"),
@@ -456,7 +457,8 @@ def train(cfg, args):
 
     out_dir = args.out or os.path.join(
         os.path.expanduser(str(cfg.paths.ckpts)),
-        f"{args.objective}_{args.init}_{args.corpus}_{args.stage}",
+        ssl_dir(str(cfg.paths.ckpts), args.objective, args.init, args.corpus,
+                args.stage, args.run_tag),
     )
     ensure_dirs(out_dir)
     done_flag = os.path.join(out_dir, "DONE")
@@ -566,6 +568,7 @@ def main():
                     choices=["local_zip", "local_webdataset", "s3_webdataset"],
                     help="gastronet read path (default: cfg.ssl.gastronet_source)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--run-tag", default=os.environ.get("RUN_TAG", ""))
     ap.add_argument("--lora", action="store_true")
     ap.add_argument("--resume", action="store_true", default=True)
     ap.add_argument("--fresh", action="store_true")

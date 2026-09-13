@@ -62,11 +62,11 @@ ssl:
   batch_size: 128
   grad_accum: 1
   num_workers: 12
-  base_lr: 1.0e-4
-  min_lr: 1.0e-6
+  base_lr: ${oc.env:BASE_LR,1.0e-4}
+  min_lr: ${oc.env:MIN_LR,1.0e-6}
   weight_decay: 0.05
   warmup_frac: 0.1
-  llrd: 0.75                               # layer-wise LR decay
+  llrd: ${oc.env:LLRD,0.75}                # layer-wise LR decay
   grad_clip: 3.0
   ema_base: 0.9995                         # backbone weight-EMA (eval artefact)
   ckpt_every_steps: 500

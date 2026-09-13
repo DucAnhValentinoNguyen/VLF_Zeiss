@@ -21,6 +21,8 @@ def _fmt(v):
 
 
 def _suspect(row) -> str:
+    if row.get("dataset") == "hyperkvasir" and row.get("task") == "hkv_tract":
+        return " †"
     a, b = row.get("accuracy"), row.get("balanced_acc")
     try:
         if a is not None and a > 0.98:
@@ -53,6 +55,7 @@ def write_pivot(df: pd.DataFrame, out_path: str, delta: pd.DataFrame | None = No
              "Primary metrics: **ECE** (equal-width & adaptive) and **NLL**. "
              "`temp_scaled=T` rows are after scalar temperature scaling. "
              "⚠ = accuracy > 0.98 or balanced_acc > accuracy + 0.02 (inspect for leakage).\n",
+             "† `hyperkvasir/hkv_tract` is structurally easy: its finding ontology is tract-exclusive; high accuracy is a caveat, not an automatic leakage finding.\n",
              "## All results\n", _table(df), "\n"]
     if delta is not None and not delta.empty:
         parts += ["\n## Δ (post-SSL − pre-SSL)\n",

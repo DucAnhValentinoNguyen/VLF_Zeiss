@@ -17,7 +17,7 @@ _ROW_COLS = [
     "ece_ew", "ece_adaptive", "nll", "brier",
     "accuracy", "balanced_acc", "macro_f1", "auroc",
     "dice", "miou", "nll_fg", "ece_ew_fg",
-    "k", "n_query", "n_classes",
+    "k", "n_query", "n_classes", "run_tag", "train_shards", "ssl_base_lr", "ssl_min_lr", "ssl_llrd",
 ]
 
 
@@ -39,20 +39,24 @@ def collect(results_dir: str) -> pd.DataFrame:
             rec["gpu"] = prov.get("gpu", "")
             rec["gpu_vram_gb"] = prov.get("gpu_vram_gb", "")
             rec["source"] = os.path.basename(fp)
+            for c in ("run_tag", "train_shards", "ssl_base_lr", "ssl_min_lr", "ssl_llrd"):
+                if rec.get(c) is None:
+                    rec[c] = prov.get(c, "")
             recs.append(rec)
     return pd.DataFrame.from_records(recs)
 
 
 def delta_view(df: pd.DataFrame) -> pd.DataFrame:
     """post - pre for matched (dataset, init, objective, corpus, task, protocol, temp_scaled)."""
-    keys = ["dataset", "init", "objective", "corpus", "task", "protocol", "temp_scaled"]
+    keys = ["dataset", "init", "objective", "corpus", "task", "protocol", "temp_scaled", "run_tag"]
     metrics = ["ece_ew", "ece_adaptive", "nll", "brier", "accuracy",
                "balanced_acc", "auroc", "dice", "miou"]
     pre = df[df.stage == "pre"].copy()
     post = df[df.stage == "post"].copy()
     # pre has objective/corpus == "none"; match it to each post variant
-    pre_any = pre.drop(columns=["objective", "corpus"])
-    merged = post.merge(pre_any, on=[k for k in keys if k not in ("objective", "corpus")],
+    pre_any = pre.drop(columns=["objective", "corpus", "run_tag"])
+    pre_any["run_tag"] = ""
+    merged = post.merge(pre_any, on=[k for k in keys if k not in ("objective", "corpus", "run_tag")],
                         suffixes=("_post", "_pre"))
     for m in metrics:
         if f"{m}_post" in merged and f"{m}_pre" in merged:

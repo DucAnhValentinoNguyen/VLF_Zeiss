@@ -53,11 +53,12 @@ def _patch_features(backbone, pil_imgs, cfg, device):
     return tok.cpu().numpy()
 
 
-def run_seg(cfg, *, dataset="hyperkvasir", init, objective, stage, corpus="gastronet") -> dict:
+def run_seg(cfg, *, dataset="hyperkvasir", init, objective, stage, corpus="gastronet", run_tag="") -> dict:
     import torch
 
     from ..data import hyperkvasir as H
     from ..models.vit_backbone import build_vit_b16
+    from ..run_paths import result_tag, ssl_dir
 
     set_seed(int(cfg.seed))
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -69,9 +70,9 @@ def run_seg(cfg, *, dataset="hyperkvasir", init, objective, stage, corpus="gastr
         backbone = build_vit_b16(init, cfg, pretrained_init=True); tag = f"{init}_pre"
     else:
         ckpt = os.path.join(os.path.expanduser(str(cfg.paths.ckpts)),
-                            f"{objective}_{init}_{corpus}_full", "ema_backbone.pt")
+                            ssl_dir(str(cfg.paths.ckpts), objective, init, corpus, "full", run_tag), "ema_backbone.pt")
         backbone = build_vit_b16(init, cfg, ckpt=ckpt)
-        tag = f"{init}_{objective}_{corpus}_post"
+        tag = result_tag(f"{init}_{objective}_{corpus}_post", run_tag)
     backbone = backbone.to(device).eval()
 
     sup = H.seg_pairs(cfg, "support")
@@ -155,8 +156,9 @@ def main():
     ap.add_argument("--objective", choices=["lejepa", "dino"], default="lejepa")
     ap.add_argument("--corpus", default="gastronet", choices=["gastronet", "hkv_unlabeled"])
     ap.add_argument("--stage", choices=["pre", "post"], required=True)
+    ap.add_argument("--run-tag", default=os.environ.get("RUN_TAG", ""))
     a = ap.parse_args()
-    run_seg(load_cfg(a.config), init=a.init, objective=a.objective, stage=a.stage, corpus=a.corpus)
+    run_seg(load_cfg(a.config), init=a.init, objective=a.objective, stage=a.stage, corpus=a.corpus, run_tag=a.run_tag)
 
 
 if __name__ == "__main__":
