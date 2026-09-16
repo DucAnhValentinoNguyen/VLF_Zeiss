@@ -855,68 +855,419 @@ in the background).
 
 ---
 
-## Execution status — 2026-09-06
+## 2026-09-10 — finish to a consistent 4-setting result (W&B + dedup + storage)
 
-**Phase 4 (before-SSL eval): DONE.** Both siglip2 + imagenet frozen ViT-B/16,
-zero-shot weighted k-NN on all 4 HyperKvasir classification tasks + zero-shot
-polyp segmentation. First real report at `$OUT_ROOT/results/report.md`:
+### Context
 
-| task | imagenet acc / AUROC | siglip2 acc / AUROC |
-|---|---|---|
-| hkv_tract     | 0.995 / 0.999 ⚠ | 0.987 / 0.998 ⚠ |
-| hkv_pathology | 0.942 / 0.983    | 0.908 / 0.957   |
-| hkv_category  | 0.940 / 0.992    | 0.897 / 0.980   |
-| hkv_findings (20-way) | 0.846 / 0.947 | 0.763 / 0.923 |
-| hkv_seg       | Dice 0.667      | Dice 0.314      |
+The SSL matrix is 3/4 done, but the run had four infra failures that are now
+fixed in code (all committed on `feat/calibration-eval-pipeline`,
+`ccb8985`…`504e658`):
 
-ImageNet init beats SigLIP-2 on every HyperKvasir task here — the SSL runs test
-whether in-domain pretraining changes that and (the actual question) the
-calibration.
+1. `ccb8985` — `training_step` used the raw optimizer step, so
+   `trainer.global_step` stayed 0 → cosine LR frozen at 0 → the first full run
+   trained *nothing*; also the WebDataset epoch was 12× too long.
+2. `c0be0e6` — the sbatch self-resubmit only fired on a clean exit; a SLURM
+   `TIMEOUT` SIGKILLs first, so two runs on a degraded node
+   (`lrz-hgx-h100-003`, ~11× slow) just stopped. Now an `EXIT` trap +
+   `--signal=B:TERM@180`; that node excluded.
+3. `f898184` — on resume Lightning re-ran a fresh `N` epochs (iterable-loader
+   epoch counter resets); LeJEPA/ImageNet did ~4 epochs. Now bounded on
+   `max_steps=total_steps`.
+4. `af991d3` + `e7f9df3` — the **home quota filled** and SIGKILLed a resume
+   mid-checkpoint (`OSError 28`). `OUT_ROOT` moved from `$HOME/vlf_zeiss_runs`
+   to `$MCMLSCRATCH/vlf_zeiss_runs` (`~/vlf_zeiss_runs` is now a symlink);
+   `train()` deletes `last.ckpt` + `ckpt-*.ckpt` once `DONE` is written.
 
-**Phase 5 (SSL on GastroNet-5M): in progress.**
-- SSL code migrated to PyTorch Lightning, validated end-to-end on an A100
-  (all 4 settings, checkpoints + `ema_backbone.pt` in the shape `run_eval`
-  reads). The intermittent CPU hang chased earlier is login-node-only.
-- EDL dropped from the benchmark (one temperature-scaled `knn` protocol).
-- `hkv_findings` label-alignment bug fixed (`canonical_classes`, global not
-  per-split) — 2.9% → 84.6%.
-- AWS data lake fully provisioned (bucket / IAM / Glue+Athena / cost budget /
-  ephemeral spot EC2). Read-only `gastronet-lake-ro` policy attached to the
-  LRZ `read-only-agent` user (inline — the 10-managed-policy quota was hit).
-- Cortex portal ingest reverse-engineered + implemented: per-file
-  `POST /api/provided_file/<id>/download_url/` → 10-min presigned URL on
-  `s3.thetavision.nl` → streamed to `raw/` with Range-resume. `portal.json`
-  (session cookie + 506-file list) lives at `s3://<bucket>/bootstrap/`.
-- **Running now:** `pipeline/kick_ingest.sh 60` — a 60-zip subset (~250 GB,
-  ~800k–1M images; full corpus is 1.88 TB / 506 zips) ingesting on the spot
-  EC2, then catalog → curate → dq. The spot instance was reclaimed once and
-  recreated (`i-091679f565fb6d44d`).
+Plus three things the user asked for this session, also committed:
 
-**Next:** when `dq/data_report.md` appears, stage or stream the curated tier and
-`bash lrz/submit_ssl_matrix.sh` (4 self-resubmitting runs). Then Phase 6:
-`submit_eval_chain.sh` picks up the `ema_backbone.pt`s and produces the
-16-row pre-vs-post delta table.
+- **W&B logging** (`9c51371`): `_wandb_logger` + `_hparams` in
+  `vlfz/ssl/pretrain.py` — one run per `{obj}_{init}_{corpus}_{stage}`, run id
+  `md5(out_dir)[:16]` so a resubmit continues the same run; ~40 hyperparameters
+  in the run config; `loss` / `loss/*` / `lr` per step, `time/epoch_min` /
+  `perf/{it,img}_per_sec` / `collapse/effective_rank` per epoch. Key in
+  `~/.wandb_key` (chmod 600); `lrz/job_env.sh` exports it + `WANDB_DIR` on
+  scratch. Entity = **personal `ducanhvalentinonguyen`** (`WANDB_ENTITY` left
+  unset), project `vlf-zeiss`.
+- **pHash cross-split dedup** (`af991d3` + `504e658`, on by default):
+  `hyperkvasir.global_split` drops every `cal`/`query` image within
+  `phash_max_dist=6` bits of any `reference` image → the leakage mitigation for
+  near-duplicate procedure frames straddling splits (`hkv_tract` is flagged at
+  99.5 % acc). Deduped split caches to `hkv_splits_dd6.json`; phash table to
+  `hkv_phash.json`; raw `hkv_splits.json` untouched. Vectorised Hamming over
+  packed uint64 in `_near_reference`.
+- **Storage monitoring** (`f81d3c1`): `scripts/storage_report.py` (os.scandir,
+  not `du`) buckets bytes by component and can log `storage_gb/*` + a table to
+  W&B; `vlfz/eval/features.py` now writes a `feat_<key>.json` sidecar so the
+  feature cache is attributable per task; `scripts/wandb_backfill.py` replays a
+  finished run's TB history into W&B under the same run id.
 
-### 2026-09-07 — Phase 5 launched
+Current results (pre-SSL baseline + 3 post deltas) are on the **raw** split and
+**pre-W&B**, and LeJEPA/ImageNet is the ~4-epoch outlier (large regression:
+acc −7…−10 pts, NLL +0.15…+0.43, seg Dice −0.15). Goal: one consistent table —
+all 4 settings, exactly 3 epochs, on the deduped split, every run in W&B, plus a
+storage snapshot.
 
-EC2 ingest abandoned (instances vanish ~20 min post-create in this account,
-spot and on-demand alike). Pivoted to `pipeline/ingest/portal_to_wds.py` on an
-LRZ login node: portal presign -> stream zip -> curate (224 / phash-dedup /
-JPEG / WebDataset tar) -> delete zip. 60-zip subset done in 155 min ->
-**581,518 images, 60 shards, 8.1 GB** at
-`$MCMLSCRATCH/gastronet5m/webdataset/`. Downloads held ~90 MB/s to Hetzner.
+### Steps
 
-`gastronet_source` default reverted to `local_webdataset`; `GASTRONET_ROOT`
-default -> `$MCMLSCRATCH/gastronet5m`. `ssl.full.epochs` env-overridable
-(`SSL_EPOCHS`). `sbatch_ssl_pretrain.sbatch` runs the venv python directly (no
-`srun` — it dropped the sbatch env on this cluster).
+0. **One small code change — record the hardware per job.** Extend
+   `vlfz/cfg.py::provenance()` (already stamps `gpu` name, `cuda`,
+   `slurm_job_id`) with `gpu_count` (`torch.cuda.device_count()`),
+   `gpu_vram_gb` (`torch.cuda.get_device_properties(0).total_memory/2**30`),
+   `slurm_partition` (`$SLURM_JOB_PARTITION`), `slurm_nodelist`
+   (`$SLURM_JOB_NODELIST`). This flows into **every** results JSON and every
+   checkpoint automatically (`run_eval.py`, `seg.py`,
+   `pretrain.save_eval_backbone` all call `provenance()`). Mirror the same keys
+   into `_hparams` in `vlfz/ssl/pretrain.py` (it already logs `node`) so W&B run
+   config shows `gpu` / `gpu_count` / `gpu_vram_gb` / `partition`. Also add a
+   `node` column to `report/aggregate.py` `_ROW_COLS` + `pivot.py` so the
+   markdown table shows which machine each row ran on. Commit as one change.
+   (The node name already encodes the type — `lrz-hgx-h100-*` /
+   `lrz-hgx-a100-*` — the explicit fields just make it filterable in W&B.)
 
-**SSL matrix queued** (jobs 5775945-48): LeJEPA/DINO x siglip2/imagenet,
-`STAGE=full SSL_EPOCHS=3`, self-resubmitting. ~4500 steps/epoch (581k / bs128).
-Then Phase 6: `submit_eval_chain.sh` picks up the 4 `ema_backbone.pt`s ->
-pre-vs-post calibration delta.
+1. **Re-run LeJEPA/ImageNet SSL clean.**
+   `rm -rf $OUT_ROOT/ssl/lejepa_imagenet_gastronet_full`, then
+   `source lrz/job_env.sh; export SSL_EPOCHS=3 GASTRONET_SOURCE=local_webdataset CORPUS=gastronet STAGE=full;
+   OBJ=lejepa INIT=imagenet sbatch lrz/sbatch_ssl_pretrain.sbatch`.
+   `max_steps` bound → exactly 14061 steps; W&B auto-attaches; cleanup keeps
+   only `ema_backbone.pt`.
 
-AWS lake infra stays built + committed (Terraform, ingest/catalog/curate/dq,
-kick_ingest.sh) as the data-engineering artefact; this run just doesn't route
-through it. The ephemeral EC2 should be torn down
-(`terraform destroy -target=aws_instance.ingest`).
+2. **Let DINO/SigLIP-2 (`5779749`) finish** (queued; resumes gstep 3500→14061).
+   This is the first SSL job with W&B live — verify a run appears under
+   `ducanhvalentinonguyen/vlf-zeiss` with the config + curves. If a node forces
+   `WANDB_MODE=offline`, `wandb sync $MCMLSCRATCH/wandb` from the login node.
+
+3. **Backfill W&B for the two already-clean runs:**
+   `python -m scripts.wandb_backfill --only lejepa_siglip2` and
+   `--only dino_imagenet` (run on a compute node or a quiet login shell — the TB
+   replay is slow on a contended login node). Skip `lejepa_imagenet` (being
+   re-run in step 1).
+
+4. **Pre-build the deduped split once** (avoids a 6-way first-run race — all
+   eval jobs would otherwise compute `hkv_phash.json` + `hkv_splits_dd6.json`
+   concurrently with no lock):
+   `source lrz/job_env.sh && python -m vlfz.data.hyperkvasir --make-splits`.
+   Confirm the printed `dropped cal=N query=M` is nonzero and a sane few percent.
+
+5. **Archive raw-split results, then run the full deduped eval sweep:**
+   - `mv $OUT_ROOT/results $OUT_ROOT/results_rawsplit_2026-09-10 && mkdir $OUT_ROOT/results`
+     (result filenames carry no dedup marker — otherwise raw + deduped rows mix).
+   - After all 4 SSL `DONE`: `bash lrz/submit_eval_chain.sh` → 6 independent jobs
+     (2 pre + 4 post), each `run_eval --task all` + `seg`. The deduped split is
+     picked up automatically from the config flag; the `feat_*.npz` cache
+     auto-misses for `cal`/`query` and correctly reuses `reference` — **no
+     `--recompute` needed**.
+   - When they finish: `python -m vlfz.report.aggregate` (the chain script does
+     not run it).
+
+6. **Storage snapshot:**
+   `python -m scripts.storage_report --wandb --json $OUT_ROOT/results/storage.json`.
+
+7. **Final artifact update** (`report.html`, same URL): 4/4 delta table on the
+   deduped split; the init-dependence finding (SSL helps the weaker SigLIP-2
+   init — ECE + segmentation; from the strong ImageNet init it is gentle-to-
+   harmful — DINO ≈ neutral, LeJEPA regresses); dedup drop counts and whether
+   `hkv_tract` falls below the 0.98 ⚠ line; a storage section; the W&B project
+   link.
+
+8. **`docs/PLAN.md`** — append a 2026-09-10 execution-status section mirroring
+   the above.
+
+### Critical files
+
+- `vlfz/cfg.py` — **edit** `provenance()`: add `gpu_count`, `gpu_vram_gb`,
+  `slurm_partition`, `slurm_nodelist`.
+- `vlfz/ssl/pretrain.py` — **edit** `_hparams`: mirror the 4 hardware keys.
+- `vlfz/report/aggregate.py` (`_ROW_COLS`) + `vlfz/report/pivot.py` — **edit**:
+  add a `node` / `gpu` column so the markdown table shows where each row ran.
+
+Reference only (committed this session):
+
+- `vlfz/data/hyperkvasir.py` — `global_split` / `_phash_table` /
+  `_near_reference` (dedup); `canonical_classes` and `seg_pairs` are
+  split-independent and unaffected.
+- `vlfz/ssl/pretrain.py` — `_wandb_logger`, `_hparams`,
+  `on_train_epoch_start/_end` timing, cleanup-after-`DONE`, `max_steps` bound.
+- `vlfz/eval/features.py` — `feat_<key>.json` sidecar.
+- `lrz/job_env.sh` — `OUT_ROOT`→scratch, `WANDB_*`.
+- `scripts/storage_report.py`, `scripts/wandb_backfill.py`.
+- `config.yaml` — `hyperkvasir.split.phash_dedup: true` / `phash_max_dist: 6`;
+  `wandb:` block.
+- `lrz/submit_eval_chain.sh` / `lrz/sbatch_eval.sbatch` — unchanged; queue 6
+  jobs keyed on checkpoint existence, overwrite result JSONs, no aggregate.
+
+### Verification
+
+- **W&B** project `vlf-zeiss` shows 4 runs — `dino_siglip2` + `lejepa_imagenet`
+  live, `lejepa_siglip2` + `dino_imagenet` backfilled — each with the full
+  hyperparameter config and `loss` / `lr` / `perf/*` / `collapse/effective_rank`
+  history.
+- **Dedup**: `hkv_splits_dd6.json` exists; `[hkv] phash dedup … dropped
+  cal=… query=…` nonzero; every post-sweep `results/*.json` has
+  `provenance.git_sha` from the sweep and a reduced `n_query` vs the archived
+  raw-split copy.
+- **SSL**: all 4 `ema_backbone.pt` report `gstep 14061` (exactly 3 epochs).
+- **Report**: `report.md` delta = 4 settings × 5 tasks; `results_rawsplit_*/`
+  retains the pre-dedup numbers for comparison.
+- **Storage**: `storage.json` written and `storage_gb/*` logged to W&B.
+- **Hardware provenance**: every `results/*.json` `provenance` block and every
+  W&B run config carries `gpu` (e.g. "NVIDIA H100 94GB" / "A100-SXM4-80GB"),
+  `gpu_count`, `gpu_vram_gb`, `slurm_partition`, `slurm_nodelist`; `report.md`
+  shows a per-row `node` column. Known so far from `sacct`: `5776886` a100-002
+  (1.5 h), `5776889` h100-013 (3.7 h), `5776887`/`5776888` h100-003 (degraded,
+  0.23 it/s, TIMEOUT), `5779402` h100-029 (23 it/s) — all single-GPU
+
+---
+
+## 2026-09-16 — Drop SigLIP-2, train SSL on the FULL GastroNet-5M corpus
+
+### Context
+
+The published 4-setting result (2026-09-12/13) used a 60-shard / 581k-image
+subset of GastroNet-5M (12% of the pool) and found SigLIP-2 losing to ImageNet
+on every task pre-SSL, and LeJEPA/ImageNet regressing severely post-SSL. The
+user's new decision: drop SigLIP-2 entirely (keep only ImageNet ViT-B/16 init,
+matching the teammate's `lilian70nn/Endoscopy` pipeline for a fairer
+comparison), and require training on the **full** ~4.9M-image corpus (506
+zips) instead of a subset — this was explicitly a MUST, not a nice-to-have.
+This coincides with the still-unresolved LRZ `LRZ_DSS06` quota bug (see the
+2026-09-14 section above) — nothing here can execute until that clears or is
+worked around, but the code changes don't depend on it and can land now.
+
+Confirmed by direct comparison against the teammate's `cortex_dataloader.py`
+(fetched via WebFetch): her approach — download one zip, decode straight from
+the zip bytes at full resolution (no resize/re-encode), yield, delete, next —
+matches the user's description exactly. Our `portal_to_wds.py` differs in one
+respect that matters here: it **curates** each zip (resize to 224px, JPEG
+re-encode, phash dedup) into permanent `.tar` shards before deleting the raw
+zip, rather than re-decoding raw pixels every epoch. That's *why* our curated
+footprint (measured: 69 zips -> 9.3GB) is far smaller than raw (69 zips'
+portal size was ~8x that) — the full 506-zip curated tier is a measured
+**~68GB**, not ~1TB.
+
+Two decisions the user made when asked (AskUserQuestion), recorded here so
+they aren't re-litigated:
+- **Multi-GPU (`--gres=gpu:2/4`): NOT pursued now.** Investigated first —
+  `vlfz/data/gastronet.py` already has DDP-safe shard splitting
+  (`nodesplitter=wds.split_by_node`, `workersplitter=wds.split_by_worker`,
+  gastronet.py:208-209) and `SSLModule` accesses `self.backbone`/`self.head`
+  directly (no `.module` indirection issues under DDP wrapping). BUT two real
+  correctness traps exist and were not solved: (1) `update_center()`
+  (dino_lib.py, used at pretrain.py:375) batch-means the teacher output
+  locally — under DDP each rank would silently drift to a different center
+  without an explicit `dist.all_reduce`, and nothing in the repo does that
+  today; (2) LeJEPA's SIGReg term is a batch-distribution statistic
+  (`sigreg_slices`/`sigreg_freqs` projections) computed per-rank on bs=128 —
+  4 ranks means 4 independent noisy estimates, not one estimate on an
+  effective bs=512, which changes what the regularizer is actually doing, not
+  just its speed. Fixing both correctly is its own sub-project. Decision:
+  **stay single-GPU**, but remove the one *free* inefficiency first (below),
+  measure, and only revisit DDP if throughput is still the bottleneck.
+- **EDA on GastroNet-5M: deferred until the full corpus is ingested.** Only
+  69/506 zips are local right now; the user chose one authoritative EDA pass
+  over the complete ~4.9M images rather than a partial one now + a redo
+  later. The reference paper link the user gave was a presigned S3 URL that
+  had already expired (5-min TTL) by fetch time — need a durable link (DOI,
+  stable URL, or the PDF itself) before this phase starts.
+
+### What changes
+
+**A. SigLIP-2 off the active path (dormant-code pattern — same treatment as
+`vlfz/data/realcolon.py` / `vlfz/eval/edl.py`; do not delete the code):**
+- `lrz/submit_ssl_matrix.sh:21` — `for INIT in siglip2 imagenet` -> `for INIT
+  in imagenet` (halves the matrix: 2 settings, not 4).
+- `lrz/submit_eval_chain.sh:25,31` — drop the unconditional SigLIP-2 pre-SSL
+  queue line; the post-SSL loop is already checkpoint-guarded but narrow it
+  too, to stop the "skip post/siglip2/..." noise.
+- `lrz/sbatch_ssl_pretrain.sbatch:23`, `lrz/sbatch_eval.sbatch:22`,
+  `vlfz/ssl/pretrain.py:562`, `config.yaml:43` — default `INIT` /
+  `init:` from `siglip2` to `imagenet`, so a bare invocation without an
+  explicit `INIT=` env var does the right thing.
+- `tests/test_backbone_parity.py:18`, `tests/smoke_ssl.sh:40` — narrow the
+  `for init in (...)` loops to `imagenet` only. This also removes the HF-token
+  dependency for CI smokes (SigLIP-2 loading needs `HF_TOKEN`,
+  `lrz/job_env.sh:68-78`; ImageNet doesn't).
+- **Leave alone**: `vlfz/models/vit_backbone.py` (`VALID_INITS`, the whole
+  `else: # siglip2` branch), `vlfz/models/load_weights.py`
+  (`openclip_siglip2_trunk`), `config.yaml:27-31` (the timm tag lookups),
+  `run_eval.py`/`seg.py` (`choices=["siglip2","imagenet"]`, no default) — all
+  harmless dormant code, same pattern as the existing REAL-Colon / EDL code.
+- **Archive, don't delete**: the 15 stale `*siglip2*.json` files in
+  `vlf_zeiss_runs/results/` -> move to `results_siglip2_archive_2026-09-16/`
+  (same pattern as the existing `results_rawsplit_2026-09-10/`), so
+  `aggregate.py`'s blind `*.json` glob stops emitting SigLIP-2 rows without
+  losing the data.
+- **Docs**: `README.md` "4 model settings", `docs/PLAN.md` (this file, the
+  original Context section) — update once the 2-setting run is actually
+  producing results, not before (avoid a doc claiming something not yet true).
+
+**B. Exact full-corpus coverage — `vlfz/data/gastronet.py::webdataset_loader`:**
+Currently `resampled=True` (samples shards *with replacement*, infinite
+stream cut to a fixed `steps_per_epoch` via `.with_epoch()`) — no finite run
+ever guarantees seeing every shard. The user chose exact coverage instead:
+- Add a `resampled: bool` param (threaded from a new
+  `cfg.ssl.gastronet_resampled` / `GASTRONET_RESAMPLED` env, default `false`
+  for the full-corpus run — keep `true` available since it's what produced
+  the published/comparable result, for anyone re-running that config).
+- When `resampled=False`: `shardshuffle=True` (shard order varies epoch to
+  epoch; within an epoch every shard is still visited exactly once) and
+  **do not call `.with_epoch(steps)`** on the `WebLoader` — let it exhaust
+  naturally each epoch. Lightning handles a finite iterable dataloader fine;
+  `max_steps=(epochs * steps_per_epoch)` (pretrain.py:531, unchanged) still
+  bounds total training, `steps_per_epoch` becomes a real derived estimate
+  (`n_shards_total * wds_images_per_shard // bs`) rather than an artificial
+  cut.
+- Note for later: 506 shards won't divide evenly across `num_workers=12`
+  (506/12 = 42.17) — some workers finish slightly early each epoch and go
+  idle rather than hang; this is normal `IterableDataset` behavior, not a bug,
+  but worth confirming with a short local smoke before trusting the full run.
+
+**C. Remove the one free inefficiency — grad checkpointing on H100/A100:**
+`SSLModule.__init__` (pretrain.py:257-260) unconditionally does
+`backbone.set_grad_checkpointing(True)` whenever CUDA is available. The
+comment there explains it as a *CPU-hang* mitigation investigation artifact,
+not a GPU necessity — at bs=128 on a 94GB H100 there's no memory pressure
+forcing this trade; checkpointing recomputes the forward pass during backward,
+costing real wall-clock for memory neither GPU needs at this scale.
+- Make it a config flag: `cfg.ssl.grad_checkpointing: ${oc.env:GRAD_CKPT,true}`
+  (default unchanged, so nothing else regresses) — the full-corpus launch sets
+  `GRAD_CKPT=0`.
+- Also make `batch_size` env-overridable (`config.yaml`: currently a bare
+  literal `128`, not templated) so a larger batch can be tried without editing
+  the file: `batch_size: ${oc.env:BATCH_SIZE,128}`.
+- **Measure before committing to an epoch count**: run a short timed smoke
+  (a few hundred steps, both objectives) with `GRAD_CKPT=0` first — this is
+  the first real execution step post-approval, since the "as many epochs as
+  possible" budget depends on the resulting it/s, which is currently unknown
+  (current measured speeds — 3.79 it/s LeJEPA, 1.07 it/s DINO — are a *floor*,
+  since disabling checkpointing can only help).
+
+**D. Storage cleanup (safe to run immediately — `rm` doesn't need write quota,
+only reads/renames):**
+1. The 3 crash-looped sweep dirs (10.7GB total: `lejepa_imagenet_gastronet_
+   full__s60_llrd0p65` 3.4GB, `__s60_lr5e-5` 3.0GB, `__s60_lr5e-5__llrd0p65`
+   4.3GB) — these are now moot (SigLIP-2 dropped, and the LeJEPA/ImageNet
+   regression investigation these sweeps were for is superseded by the
+   full-corpus re-run). Delete entirely.
+2. `siglip2_runs/` (29GB, top-level under `ra82sat2/`, last touched 2026-07-29,
+   predates VLF_Zeiss) — user confirmed deletion.
+3. `hf_cache/` (39GB after the earlier partial cleanup) — user confirmed full
+   deletion including MedSigLIP-448/EndoViT/DINOv2/remaining timm checkpoints,
+   understanding it's a shared cache across other LRZ projects on this
+   account and will silently re-download on next use elsewhere. VLF_Zeiss
+   itself only needs the ImageNet ViT-B/16 weights going forward (SigLIP-2
+   dropped), which are cheap to refetch.
+4. Note the caveat already established on 2026-09-14: this brings *our own
+   measured* usage under `ra82sat2/` from ~108GB down to roughly ~30GB, but
+   the LRZ_DSS06 quota has not responded to real deletions before (95GB then
+   4.4MB, zero movement both times) — treat this as necessary hygiene, not a
+   guaranteed unblock. The LRZ ticket (quota shows 200/200 GB, `du`-measured
+   usage ~108GB, matches the DSSFS06 maintenance window) is still the real
+   fix and should be filed/chased in parallel, not instead of this cleanup.
+
+**E. Resume the full ingest — `lrz/backfill_gastronet_full.sh`:**
+The corrupt-zip crash fix (committed `22df058`, this session) is already in
+place. Once writes to `pr74ze-dss-0001` succeed again: run the backfill for
+the remaining 437 zips (506 - 69 already done). At the measured rate (69
+zips / 155min for the first batch, though later zips may differ) this is
+order ~15-20h — run it as its own background/detached job (not blocking
+other work), checking `_ingested.txt` / `_failed.txt` counts periodically.
+Expected final size: **~68GB curated**, ~4.9M images (minus phash dedup and
+any `_failed.txt` entries).
+
+**F. Launch the 2-setting full-corpus SSL runs:**
+`OBJ={lejepa,dino} INIT=imagenet CORPUS=gastronet STAGE=full
+GASTRONET_RESAMPLED=0 GRAD_CKPT=0 SSL_EPOCHS=<measured-budget> sbatch
+lrz/sbatch_ssl_pretrain.sbatch` — self-resubmitting as today, `max_steps`
+bound prevents the resume-epoch-counter bug from recurring. Epoch count
+decided after step C's throughput measurement against a wall-clock budget
+(not fixed here) — the existing self-resubmit + `EXIT` trap infrastructure
+means the target can be raised later by bumping `SSL_EPOCHS` and resubmitting
+a *finished* (DONE-flagged) run fresh, but not safely mid-run (changing
+`total_steps` interacts with the `max_steps` trainer bound on an in-progress
+resume — decide the target before starting, or only extend a completed run).
+
+**G. Post-SSL eval + aggregate:** unchanged machinery
+(`submit_eval_chain.sh`), now naturally narrower (2 settings x 5 tasks = 10
+post-SSL rows instead of 20). `aggregate.py`/`pivot.py` need no code change
+(both are data-driven off the results JSONs, confirmed by Explore agent).
+
+**H. GastroNet-5M EDA (deferred, gated on E):** adapt the already-written
+`pipeline/dq/checks.py` (corrupt %, phash dup-cluster %, dimension + RGB/
+grayscale histograms — built for exactly this, currently unrun) to read the
+local WebDataset tier; run once the full corpus is in; new artifact page with
+findings, folding in the reference paper's documented quirks once a durable
+link is provided.
+
+**I. Model selection + checkpoint promotion — this is the actual end goal.**
+The user's stated purpose for all of the above: pick whichever of the 2
+full-corpus settings performs best, treat its checkpoint as "our foundation
+model," and keep fine-tuning *that one* on other downstream tasks afterward.
+That changes what matters about the checkpoint from "one row in a comparison
+table" to "a durable asset something else depends on" — needs an explicit
+selection rule and a promotion step, not just a bigger results table.
+
+- **Selection metric.** A foundation model meant for further fine-tuning is
+  judged on transferable representation quality, not on frozen-feature
+  calibration — fine-tuning recalibrates anyway. Primary criterion:
+  **mean post-SSL balanced-accuracy across the 4 classification tasks +
+  Dice on `hkv_seg`**, i.e. discriminative zero-shot quality, not ECE/NLL.
+  ECE/NLL and the `collapse/effective_rank` W&B curve serve as a **gate, not
+  the ranking**: a candidate that regressed vs. its own pre-SSL baseline on
+  the primary metric, or whose effective rank collapsed (this benchmark's
+  own precedent — the earlier LeJEPA/ImageNet run on the 581k subset lost
+  19-62 accuracy points; watch for a repeat on the full corpus before
+  trusting either result) is disqualified regardless of any other number
+  looking good. With SigLIP-2 dropped this is a straight DINO-vs-LeJEPA
+  pairwise call, not a 4-way ranking.
+- **Promotion, not just "keep the file."** `save_eval_backbone()`
+  (pretrain.py:420) already writes `ema_backbone.pt` per setting, but nothing
+  marks one as *the* model or protects it from the per-setting cleanup logic
+  (`e7f9df3`: finished runs auto-delete resume checkpoints). Add a promotion
+  step once both settings finish: copy the winning `ema_backbone.pt` to a
+  separate `$OUT_ROOT/foundation_model/ema_backbone.pt`, alongside a
+  `foundation_model/CARD.json` recording which setting won, the metric values
+  that decided it (**both** settings' numbers, so the decision stays
+  auditable), corpus size, epoch/step count, git SHA, date.
+- **Don't let this depend on LRZ scratch's reliability.** Given the exact
+  failure mode this session spent days on (LRZ_DSS06 stuck at its quota cap;
+  a crash loop that nearly clobbered checkpoints), the one file everything
+  downstream depends on should not live *only* on that storage. W&B is
+  already wired up (`_wandb_logger`, pretrain.py) — log the winning
+  `ema_backbone.pt` as a versioned **W&B Artifact** at promotion time. A few
+  lines (`wandb.Artifact(...).add_file(...)`), and the foundation-model
+  checkpoint becomes durable and decoupled from LRZ storage entirely.
+- Downstream fine-tuning tasks are explicitly **out of scope for this plan** —
+  the deliverable stops at a promoted, documented, durably-stored checkpoint
+  ready for that next phase.
+
+### Critical files
+- `lrz/submit_ssl_matrix.sh`, `lrz/submit_eval_chain.sh`,
+  `lrz/sbatch_ssl_pretrain.sbatch`, `lrz/sbatch_eval.sbatch` — matrix/default edits.
+- `vlfz/ssl/pretrain.py` — `INIT` default, `grad_checkpointing` config wiring.
+- `vlfz/data/gastronet.py::webdataset_loader` — `resampled` branch.
+- `config.yaml` — `gastronet_resampled`, `grad_checkpointing`, `batch_size` env templating.
+- `tests/test_backbone_parity.py`, `tests/smoke_ssl.sh` — narrow init loops.
+- `pipeline/dq/checks.py` — reference for the deferred EDA phase.
+
+### Verification
+- `python -m pytest -q` green after the init-loop narrowing (no more HF_TOKEN
+  dependency in CI smokes).
+- A short `GRAD_CKPT=0` timed smoke shows it/s >= the current measured floor
+  (3.79 LeJEPA / 1.07 DINO) before trusting it for the full-budget calculation.
+- `resampled=False` smoke: iterate one full local pass over the 69 currently-
+  ingested shards, confirm every shard is visited exactly once (log line per
+  shard boundary) and no worker hangs.
+- Storage: `mmlsquota` / a live `dd` write-test re-checked after cleanup +
+  after any LRZ-side fix, not assumed from the dashboard banner alone (per
+  the 2026-09-14 lesson).
+- Post full-ingest: `_ingested.txt` line count == 506 (or 506 minus a
+  documented `_failed.txt` remainder), curated tier ~68GB.
+- Final SSL artifacts: both `ema_backbone.pt` files report the expected
+  `gstep` for the chosen epoch budget; W&B shows both runs with
+  `loss`/`collapse/effective_rank` curves, no non-finite-loss skips.
+- Foundation model: `foundation_model/ema_backbone.pt` + `CARD.json` exist,
+  the card's recorded winning metrics match `report.md`, and the same file is
+  retrievable as a W&B Artifact (verify by resolving the artifact version
+  from a clean shell, not just by trusting the upload log) — i.e. the
+  checkpoint survives LRZ storage being unavailable.
+  (`--gres=gpu:1`, ~80 GB A100 / ~94 GB H100).
