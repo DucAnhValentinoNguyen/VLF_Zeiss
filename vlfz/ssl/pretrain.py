@@ -115,7 +115,9 @@ def _make_loader(cfg, args, transform, collate, *, bs, nw, dev):
         manifest = index_manifest(client, cache, manifest_path)
         stream = PortalStream(client, cache, manifest, transform, collate, bs,
                               int(cfg.seed), int(cfg.ssl.full.epochs),
-                              transform_workers=int(getattr(cfg.ssl, 'portal_transform_workers', 0)))
+                              transform_workers=int(getattr(cfg.ssl, 'portal_transform_workers', 0)),
+                              max_failure_rate=float(getattr(cfg.ssl, 'portal_max_failure_rate', 0.001)),
+                              failure_min_sample=int(getattr(cfg.ssl, 'portal_failure_min_sample', 1000)))
         if nw and stream.transform_workers:
             raise ValueError('Use portal_num_workers=0 with parallel transform workers')
         loader_kwargs = dict(batch_size=None, num_workers=nw,

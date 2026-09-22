@@ -43,6 +43,13 @@ ssl:
   # Parent owns stream/cursor; spawned workers parallelize per-image transforms.
   portal_num_workers: ${oc.env:PORTAL_NUM_WORKERS,0}
   portal_transform_workers: ${oc.env:PORTAL_TRANSFORM_WORKERS,4}
+  # A corrupt/truncated image is tolerated (skipped, logged, counted) up to
+  # this rate; crossing it hard-fails the run rather than silently eating an
+  # unbounded amount of coverage. Evaluated only once at least
+  # portal_failure_min_sample images have been attempted, so a handful of
+  # early failures can't trip it. Counts persist across checkpoint resumes.
+  portal_max_failure_rate: ${oc.env:PORTAL_MAX_FAILURE_RATE,0.001}
+  portal_failure_min_sample: ${oc.env:PORTAL_FAILURE_MIN_SAMPLE,1000}
   grad_checkpointing: ${oc.env:GRAD_CKPT,true}
   stage: ${oc.env:STAGE,smoke}
   objective: ${oc.env:OBJ,lejepa}          # lejepa | dino

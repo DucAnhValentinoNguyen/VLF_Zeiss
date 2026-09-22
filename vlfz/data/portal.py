@@ -364,18 +364,39 @@ def batch_sizes(n, size):
 
 
 class PortalStream(IterableDataset):
-    """Iterable batch source. Call commit only after a successful optimizer step."""
+    """Iterable batch source. Call commit only after a successful optimizer step.
+
+    A corrupt/truncated image is skipped rather than crashing the run, but
+    only up to ``max_failure_rate`` of images attempted (checked once at
+    least ``failure_min_sample`` have been attempted) -- bounded tolerance,
+    not unlimited silent coverage loss. Crossing the bound raises, on the
+    theory that a rate that high means something systemic (a bad archive, a
+    flaky portal) rather than one-off corruption, and that's worth a human
+    looking at rather than quietly continuing. Counts persist across
+    checkpoint resumes (state_dict/load_state_dict) so the bound applies to
+    the whole run, not just one epoch or one allocation.
+    """
     def __init__(self, client, cache, manifest, transform, collate, batch_size=128, seed=0, epochs=3,
-                 transform_workers=0):
+                 transform_workers=0, max_failure_rate=0.001, failure_min_sample=1000):
         self.client, self.cache, self.manifest = client, cache, manifest
         self.transform, self.collate = transform, collate
         self.seed, self.epochs = seed, epochs
         self.transform_workers = transform_workers
+        self.max_failure_rate = max_failure_rate
+        self.failure_min_sample = failure_min_sample
         self.sizes = batch_sizes(sum(len(a['members']) for a in manifest['archives']), batch_size)
         self.cursor = {'epoch': 0, 'batch': 0}
+        # Live counts advance as samples are produced (the threshold check in
+        # record_failure needs that, in real time, independent of commits).
+        # _committed is the snapshot state_dict()/checkpointing sees -- frozen
+        # between commits, exactly like self.cursor, so a crash between
+        # producing and committing a batch doesn't change what a resume sees.
+        self.attempts = 0
+        self.failures = 0
+        self._committed = {'attempts': 0, 'failures': 0}
 
     def state_dict(self):
-        return {**self.cursor, 'fingerprint': self.manifest['fingerprint']}
+        return {**self.cursor, 'fingerprint': self.manifest['fingerprint'], **self._committed}
 
     def coverage(self):
         completed = self.cursor['epoch']
@@ -383,15 +404,31 @@ class PortalStream(IterableDataset):
                 'archives_per_completed_epoch': len(self.manifest['archives']),
                 'images_per_completed_epoch': sum(self.sizes),
                 'images_in_current_epoch': sum(self.sizes[:self.cursor['batch']]),
-                'decode_failures': 0}
+                'decode_attempts': self.attempts, 'decode_failures': self.failures}
 
     def load_state_dict(self, state):
         if state['fingerprint'] != self.manifest['fingerprint']:
             raise RuntimeError('Checkpoint manifest mismatch')
         self.cursor = {k: state[k] for k in ('epoch', 'batch')}
+        # Older checkpoints (pre-2026-09-22) never recorded these.
+        self.attempts = self._committed['attempts'] = state.get('attempts', 0)
+        self.failures = self._committed['failures'] = state.get('failures', 0)
 
     def commit(self, cursor):
         self.cursor = dict(cursor)
+        self._committed = {'attempts': self.attempts, 'failures': self.failures}
+
+    def record_failure(self, identity, error):
+        self.failures += 1
+        print(f'[portal] failed for {identity}: {error!r} -- skipping '
+              f'({self.failures}/{self.attempts} failed so far)', flush=True)
+        if (self.attempts >= self.failure_min_sample
+                and self.failures / self.attempts > self.max_failure_rate):
+            raise RuntimeError(
+                f'Portal failure rate {self.failures}/{self.attempts} = '
+                f'{self.failures / self.attempts:.4%} exceeded max_failure_rate='
+                f'{self.max_failure_rate:.4%} (min_sample={self.failure_min_sample}); '
+                'stopping rather than continuing to silently lose coverage.')
 
     @staticmethod
     def decode(raw):
@@ -437,14 +474,19 @@ class PortalStream(IterableDataset):
                             try:
                                 tasks.append((read_member(n), identity))
                             except (OSError, zipfile.BadZipFile, EOFError) as e:
-                                print(f'[portal] extract failed for {identity}: {e!r} -- skipping',
-                                      flush=True)
+                                self.attempts += 1
+                                self.record_failure(identity, e)
                                 tasks.append((None, identity))
                         samples = (transforms.map(_worker_sample, tasks) if transforms else
                                    (_transform_sample(*task, self.transform) for task in tasks))
-                        for sample in samples:
+                        for (raw, identity), sample in zip(tasks, samples):
+                            if raw is None and sample is None:
+                                continue  # already counted as a failure above
                             if sample is None:
+                                self.attempts += 1
+                                self.record_failure(identity, 'decode failed (see worker log above)')
                                 continue
+                            self.attempts += 1
                             batch.append(sample)
                             if len(batch) == self.sizes[bi]:
                                 bi += 1

@@ -20,8 +20,19 @@ Authentication uses `PORTAL_JSON` (default `~/.gastronet_portal/portal.json`).
 An optional private `CORTEX_ACCESS_URL` enables session renewal. Do not put
 credentials, access links, or signed download URLs into version control.
 
-The manifest is indexed before training. Every archive must be readable;
-corrupt images/archives stop execution rather than silently reducing coverage.
+The manifest is indexed before training. A corrupt/truncated image or archive
+member is skipped and logged rather than crashing the run (2026-09-22: DINO
+and LeJEPA both died on `OSError: image file is truncated` within the first
+day, unhandled), but only up to `portal_max_failure_rate` (default 0.1%,
+checked once `portal_failure_min_sample` images -- default 1000 -- have been
+attempted): crossing that bound raises, since a rate that high means
+something systemic rather than one-off corruption, and coverage loss stays
+bounded rather than unlimited-and-silent either way. A manifest/archive
+mismatch (a named member that's actually missing) is not covered by this and
+still stops execution immediately -- that indicates the manifest itself is
+wrong, not a bad file. `PortalStream.coverage()` reports `decode_attempts`/
+`decode_failures`; both persist across checkpoint resumes, so the bound
+applies to the whole run, not just one epoch or one allocation.
 Each epoch shuffles archives and members deterministically. Training commits
 the cursor only after the optimizer step; checkpoint replay uses the saved
 cursor and deterministic sample augmentation. Epoch tails are retained, with

@@ -196,6 +196,57 @@ def test_corrupt_member_blocks_coverage(tmp_path):
     assert stream.cursor == {'epoch': 0, 'batch': 0}
 
 
+def _corrupt(tmp_path, archive, member):
+    """Overwrite one member of one fixture archive with unreadable bytes,
+    keeping the other members (and the manifest's declared member list)
+    intact -- unlike test_corrupt_member_blocks_coverage, this simulates a
+    single truncated image inside an otherwise-valid archive, not a
+    manifest/archive mismatch."""
+    path = tmp_path / f'source{archive}.zip'
+    data = {i.filename: i for i in zipfile.ZipFile(path).infolist()}
+    contents = {n: zipfile.ZipFile(path).read(n) for n in data}
+    contents[f'{member}.png'] = b'not an image'
+    with zipfile.ZipFile(path, 'w') as z:
+        for name, raw in contents.items():
+            z.writestr(name, raw)
+
+
+def test_one_bad_image_is_skipped_not_raised(tmp_path):
+    stream = fixture_stream(tmp_path, epochs=1)
+    stream.max_failure_rate, stream.failure_min_sample = 0.5, 2
+    _corrupt(tmp_path, archive=0, member=0)
+    batches = list(stream)
+    assert stream.failures == 1 and stream.attempts == 9
+    # sizes=[4,5] for 9 images (batch_sizes' tail-merge rule); dropping 1
+    # leaves only 4 valid images for what would be the size-5 tail batch, so
+    # -- same as any incomplete tail, corrupted or not -- it's never yielded.
+    # Only the first, complete batch comes through.
+    assert sum(len(b['views']) for b in batches) == 4
+
+
+def test_failure_rate_above_threshold_raises(tmp_path):
+    stream = fixture_stream(tmp_path, epochs=1)
+    stream.max_failure_rate, stream.failure_min_sample = 0.1, 2
+    _corrupt(tmp_path, archive=0, member=0)
+    _corrupt(tmp_path, archive=0, member=1)
+    with pytest.raises(RuntimeError, match='failure rate'):
+        list(stream)
+
+
+def test_failure_counts_freeze_between_commits(tmp_path):
+    stream = fixture_stream(tmp_path, epochs=1)
+    first = next(iter(stream))
+    stream.commit(first['cursor'])
+    state = stream.state_dict()
+    # Simulate production advancing past the last commit without a new
+    # commit -- state_dict() must not move, same invariant as cursor itself,
+    # so a crash here loses at most the uncommitted batch, never corrupts
+    # what a resume trusts.
+    stream.attempts += 1
+    stream.failures += 1
+    assert stream.state_dict() == state
+
+
 def test_7z_archives_are_listed_and_read(tmp_path):
     if not shutil.which('7z'):
         pytest.skip('system 7z is not installed')
