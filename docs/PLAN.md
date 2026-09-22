@@ -1018,6 +1018,19 @@ Reference only (committed this session):
 
 ---
 
+## 2026-09-17 — Bounded raw portal streaming implementation
+
+The full-corpus path now uses `GASTRONET_SOURCE=portal_zip`: a frozen
+506-archive manifest, a 16 GiB current/next ZIP cache, and three finite raw-image
+passes for ImageNet DINO and LeJEPA. This supersedes the permanent curated-ingest
+requirement below. See [FULLSTREAM.md](FULLSTREAM.md) for launch and recovery.
+Outputs use a separate real home directory rather than the project quota.
+
+Synthetic coverage/download tests and a CPU Lightning interruption/resume
+equivalence test pass. Live portal verification returned HTTP 403 on September
+17; GPU pilots and sustained training have not been submitted pending refreshed
+private portal credentials. No full-corpus accuracy results are claimed.
+
 ## 2026-09-16 — Drop SigLIP-2, train SSL on the FULL GastroNet-5M corpus
 
 ### Context

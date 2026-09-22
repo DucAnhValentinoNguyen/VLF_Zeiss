@@ -44,10 +44,17 @@ export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-eu-north-1}"
 export GASTRONET_SOURCE="${GASTRONET_SOURCE:-local_webdataset}"
 export PATH="$HOME/bin:$PATH"
 
-# --- Weights & Biases (opt-in; key in ~/.wandb_key chmod 600, never committed) ---
+# --- Weights & Biases (opt-in; credentials never enter the repository) ---
 # Run dirs go on scratch, NEVER the home quota.
+# Prefer the credential maintained by `wandb login` over the legacy
+# ~/.wandb_key fallback. The latter can remain on disk after a key renewal and
+# otherwise silently overrides the current credential in ~/.netrc.
+if [ -z "${WANDB_API_KEY:-}" ]; then
+  WANDB_API_KEY="$(python -c 'import netrc; print(netrc.netrc().authenticators("api.wandb.ai")[2])' 2>/dev/null || true)"
+fi
 [ -z "${WANDB_API_KEY:-}" ] && [ -f "$HOME/.wandb_key" ] && \
-  export WANDB_API_KEY="$(cat "$HOME/.wandb_key")"
+  WANDB_API_KEY="$(cat "$HOME/.wandb_key")"
+[ -n "${WANDB_API_KEY:-}" ] && export WANDB_API_KEY
 export WANDB_PROJECT="${WANDB_PROJECT:-vlf-zeiss}"
 export WANDB_ENTITY="${WANDB_ENTITY:-}"        # empty -> the key's default (personal) entity
 export WANDB_DIR="${WANDB_DIR:-$MCMLSCRATCH/wandb}"

@@ -38,6 +38,12 @@ backbones:
   norm_std:  [0.229, 0.224, 0.225]
 
 ssl:
+  portal_json: ${oc.env:PORTAL_JSON,'~/.gastronet_portal/portal.json'}
+  portal_cache: ${oc.env:PORTAL_CACHE,'~/vlf_zeiss_fullstream/zip_cache'}
+  # Parent owns stream/cursor; spawned workers parallelize per-image transforms.
+  portal_num_workers: ${oc.env:PORTAL_NUM_WORKERS,0}
+  portal_transform_workers: ${oc.env:PORTAL_TRANSFORM_WORKERS,4}
+  grad_checkpointing: ${oc.env:GRAD_CKPT,true}
   stage: ${oc.env:STAGE,smoke}
   objective: ${oc.env:OBJ,lejepa}          # lejepa | dino
   init: ${oc.env:INIT,siglip2}             # siglip2 | imagenet
@@ -59,7 +65,7 @@ ssl:
   steps_per_epoch: ${oc.env:STEPS_PER_EPOCH,0}   # 0 -> derive from shard count / bs
   # local_zip only: class/shard-balanced image subset (full webdataset tier ignores this)
   subset_images: ${oc.env:SUBSET_IMAGES,700000}
-  batch_size: 128
+  batch_size: ${oc.env:BATCH_SIZE,128}
   grad_accum: 1
   num_workers: 12
   base_lr: ${oc.env:BASE_LR,1.0e-4}

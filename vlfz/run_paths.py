@@ -12,3 +12,13 @@ def ssl_dir(ckpts: str, objective: str, init: str, corpus: str,
 
 def result_tag(base: str, run_tag: str = "") -> str:
     return tagged_name(base, run_tag)
+
+
+def checkpoint_metadata(cfg, objective, init, corpus, run_tag):
+    import torch
+    path = os.path.join(ssl_dir(str(cfg.paths.ckpts), objective, init, corpus, run_tag=run_tag),
+                        'ema_backbone.pt')
+    if not os.path.isfile(path):
+        return {'run_tag': run_tag}
+    return torch.load(path, map_location='cpu', weights_only=False).get('training_metadata',
+                                                                      {'run_tag': run_tag})

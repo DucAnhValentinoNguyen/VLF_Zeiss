@@ -115,6 +115,7 @@
 <nav class="toc">
   <div class="wrap">
     <a href="#context">Context</a>
+    <a href="#live-status">Live status</a>
     <a href="#decisions">Decisions</a>
     <a href="#changes">What changes</a>
     <a href="#foundation">Foundation model</a>
@@ -151,6 +152,96 @@
     <div class="tile"><div class="lab">End artifact</div><div class="big">table &rarr; checkpoint</div>
       <div class="cap">Not just a results row &mdash; a promoted, documented,
         W&amp;B-Artifact-backed checkpoint for future fine-tuning.</div></div>
+  </div>
+</section>
+
+<section class="part" id="live-status">
+  <div class="callout">
+    <div class="lab">Latest deployment · 2026-09-18 · static snapshot</div>
+    <p>This update supersedes the older job and loader details below. DINO job
+      <code>5796919</code> and LeJEPA job <code>5796922</code> are submitted independently,
+      both pending on priority with 24-hour limits. Job <code>5796510</code> was replaced.
+      Four spawned CPU processes now decode and augment images in deterministic order;
+      DataLoader workers are zero. ZIP handles stay open; 7z archives extract once with
+      a 16 GiB combined archive/extraction budget. Each objective uses a separate cache,
+      and evaluations share a lock. All 19 targeted tests pass. Every 100 new steps logs
+      measured throughput; end-to-end speedup and revised ETA await GPU execution.</p>
+  </div>
+  <div class="part-head"><span class="n">LIVE</span><div><h2>Full-stream run status</h2></div></div>
+  <div class="callout good">
+    <div class="lab">Checked 2026-09-18</div>
+    <p><strong>LeJEPA did not crash.</strong> The W&amp;B run showing 199 steps is the completed
+      200-step pilot. The full LeJEPA run has not started yet. The active job is the resumable
+      full DINO run; there are no full-stream jobs waiting in the Slurm queue.</p>
+  </div>
+  <div class="phases">
+    <div class="phase"><span class="id">1</span><span class="pill done">done</span>
+      <div class="t">DINO pilot</div>
+      <div class="d">200 steps, used to validate the portal stream and measure throughput.</div></div>
+    <div class="phase"><span class="id">2</span><span class="pill done">done</span>
+      <div class="t">LeJEPA pilot</div>
+      <div class="d">200 steps, completed successfully. Its W&amp;B state is <code>finished</code>
+        because the pilot process exited normally; it is not evidence of a completed 3-epoch run.</div></div>
+    <div class="phase"><span class="id">3</span><span class="pill now">now</span>
+      <div class="t">Full DINO</div>
+      <div class="d">Continuation <code>5796510</code> is queued and will resume from
+        <code>last.ckpt</code>,
+        configured for 113,064 optimizer steps (3 passes over the 506-archive manifest).
+        It is the first continuation that will load the optimized ZIP reader and one-worker
+        prefetch path. Each six-hour allocation checkpoints near walltime and resubmits itself.</div></div>
+    <div class="phase"><span class="id">4</span><span class="pill next">next</span>
+      <div class="t">Full LeJEPA</div>
+      <div class="d">Starts only after full DINO and its evaluation complete. No
+        <code>full_lejepa</code> directory or full LeJEPA log exists yet.</div></div>
+  </div>
+
+  <h3>What is actually stored</h3>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>item</th><th>current state</th></tr></thead>
+      <tbody>
+        <tr><td>Portal manifest</td><td><strong>Complete:</strong> 506/506 archives indexed, 4,823,974 image members, about 1.75 TiB declared archive bytes.</td></tr>
+        <tr><td>ZIP contents</td><td><strong>Not fully copied:</strong> only the active two-archive working set is cached locally (about 7.1 GiB at the last check).</td></tr>
+        <tr><td>Full DINO checkpoint</td><td><code>last.ckpt</code> plus periodic checkpoints and <code>ema_backbone.pt</code> are present; the cursor resumes the stream.</td></tr>
+        <tr><td>Full LeJEPA checkpoint</td><td>Not applicable yet; only the LeJEPA pilot checkpoint exists.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>How the portal dataloader works</h3>
+  <div class="prose">
+    <p>The job uses <code>GASTRONET_SOURCE=portal_zip</code>, not a local full-corpus copy.
+      The 91&nbsp;MB manifest stores the fixed archive list, sizes, IDs, and image-member names;
+      it does not store the image bytes. For each epoch the loader deterministically shuffles
+      the 506 archives and the members inside each archive, downloads the current archive plus
+      a prefetched next archive, and reads image members directly from the ZIP.</p>
+    <p>The cache has a 16&nbsp;GiB budget and an exclusive lock. At most two archives are reserved:
+      four compressed members are read at a time, four decoder threads convert them to RGB, the
+      transform creates the SSL views, and batches of 128 go to the GPU. Once an archive is
+      exhausted its ZIP is deleted. Thus the run uses a sliding two-archive cache rather than
+      storing 1.75&nbsp;TiB locally.</p>
+    <p>The optimized loader uses exactly one non-persistent DataLoader worker. This prepares one
+      batch ahead while the GPU trains, but a fresh worker each epoch inherits the parent's
+      committed cursor; multiple or persistent workers remain prohibited because they would
+      duplicate the iterable stream or retain stale progress. Download prefetch and four-thread
+      image decoding still happen inside that single stream. After every successful optimizer
+      step, the parent cursor records the epoch and batch. The
+      checkpoint also stores the manifest fingerprint and RNG state, so a walltime resubmission
+      continues from the last committed batch without changing sample order or repeating a
+      completed batch.</p>
+  </div>
+
+  <div class="callout">
+    <div class="lab">Optimization deployed; measurement pending</div>
+    <p>The original portal-ZIP path averaged only 4.6% GPU utilization and about 0.08
+      iterations/sec. Profiling found that every image reopened its multi-gigabyte ZIP and
+      reparsed a roughly 10k-entry central directory. On a cached production archive, reading
+      32 members took 2.59 seconds this way versus 0.073 seconds with one persistent archive
+      handle (35&times; faster for this stage). The next continuation keeps each ZIP open and
+      overlaps one prepared batch with GPU compute. Tests preserve exact archive coverage,
+      deterministic cursor resume, and checkpoint equivalence. End-to-end improvement will be
+      measured on job <code>5796510</code>; CPU DINO augmentation and the 13 remaining 7z
+      archives are the next likely targets.</p>
   </div>
 </section>
 

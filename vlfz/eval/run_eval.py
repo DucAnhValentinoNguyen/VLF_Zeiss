@@ -19,7 +19,7 @@ import os
 from ..cfg import ensure_dirs, load_cfg, provenance, set_seed
 from ..data.registry import get_dataset
 from ..models.vit_backbone import build_vit_b16
-from ..run_paths import result_tag, ssl_dir
+from ..run_paths import result_tag, ssl_dir, checkpoint_metadata
 from .calibration import calibration_report
 from .features import extract_features
 from .knn import knn_k_sweep, knn_vote
@@ -30,7 +30,6 @@ def _backbone_and_tag(cfg, init, objective, stage, corpus, run_tag=""):
     if stage == "pre":
         return build_vit_b16(init, cfg, pretrained_init=True), f"{init}_pre"
     ckpt = os.path.join(
-        os.path.expanduser(str(cfg.paths.ckpts)),
         ssl_dir(str(cfg.paths.ckpts), objective, init, corpus, "full", run_tag), "ema_backbone.pt",
     )
     if not run_tag and not os.path.exists(ckpt):  # tolerate the older name without a corpus tag
@@ -82,9 +81,8 @@ def evaluate(cfg, *, dataset, init, objective, stage, task, protocols, corpus="g
             "objective": ("none" if stage == "pre" else objective),
             "corpus": ("none" if stage == "pre" else corpus),
             "n_query": int(len(yq)), "n_classes": int(C)}
-    base.update({"run_tag": run_tag, "train_shards": int(os.environ.get("TRAIN_SHARDS", "0") or 0),
-                 "ssl_base_lr": float(cfg.ssl.base_lr), "ssl_min_lr": float(cfg.ssl.min_lr),
-                 "ssl_llrd": float(cfg.ssl.llrd)})
+    meta = checkpoint_metadata(cfg, objective, init, corpus, run_tag) if stage == 'post' else {'run_tag': ''}
+    base.update(meta)
     rows: list[dict] = []
     aux: dict = {}
 
@@ -105,9 +103,7 @@ def evaluate(cfg, *, dataset, init, objective, stage, task, protocols, corpus="g
            "splits": ds.split_sizes(cfg),
            "provenance": provenance(int(cfg.seed), dataset=dataset, init=init,
                                     objective=objective, stage=stage, task=task, corpus=corpus,
-                                    run_tag=run_tag, train_shards=base["train_shards"],
-                                    ssl_base_lr=base["ssl_base_lr"], ssl_min_lr=base["ssl_min_lr"],
-                                    ssl_llrd=base["ssl_llrd"])}
+                                    **meta)}
     fp = os.path.join(results_dir, f"{dataset}__{tag}__{task}.json")
     json.dump(out, open(fp, "w"), indent=2, default=float)
     print(f"[eval] wrote {fp}  ({len(rows)} rows)")

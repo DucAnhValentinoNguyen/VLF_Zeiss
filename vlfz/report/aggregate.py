@@ -18,6 +18,7 @@ _ROW_COLS = [
     "accuracy", "balanced_acc", "macro_f1", "auroc",
     "dice", "miou", "nll_fg", "ece_ew_fg",
     "k", "n_query", "n_classes", "run_tag", "train_shards", "ssl_base_lr", "ssl_min_lr", "ssl_llrd",
+    "manifest_fingerprint", "preprocessing", "completed_epochs", "images_per_epoch", "ssl_source",
 ]
 
 
@@ -51,11 +52,13 @@ def delta_view(df: pd.DataFrame) -> pd.DataFrame:
     keys = ["dataset", "init", "objective", "corpus", "task", "protocol", "temp_scaled", "run_tag"]
     metrics = ["ece_ew", "ece_adaptive", "nll", "brier", "accuracy",
                "balanced_acc", "auroc", "dice", "miou"]
+    df = df.copy()
+    if 'run_tag' not in df:
+        df['run_tag'] = ''
     pre = df[df.stage == "pre"].copy()
     post = df[df.stage == "post"].copy()
     # pre has objective/corpus == "none"; match it to each post variant
     pre_any = pre.drop(columns=["objective", "corpus", "run_tag"])
-    pre_any["run_tag"] = ""
     merged = post.merge(pre_any, on=[k for k in keys if k not in ("objective", "corpus", "run_tag")],
                         suffixes=("_post", "_pre"))
     for m in metrics:

@@ -69,8 +69,7 @@ def run_seg(cfg, *, dataset="hyperkvasir", init, objective, stage, corpus="gastr
     if stage == "pre":
         backbone = build_vit_b16(init, cfg, pretrained_init=True); tag = f"{init}_pre"
     else:
-        ckpt = os.path.join(os.path.expanduser(str(cfg.paths.ckpts)),
-                            ssl_dir(str(cfg.paths.ckpts), objective, init, corpus, "full", run_tag), "ema_backbone.pt")
+        ckpt = os.path.join(ssl_dir(str(cfg.paths.ckpts), objective, init, corpus, "full", run_tag), "ema_backbone.pt")
         backbone = build_vit_b16(init, cfg, ckpt=ckpt)
         tag = result_tag(f"{init}_{objective}_{corpus}_post", run_tag)
     backbone = backbone.to(device).eval()
@@ -130,6 +129,11 @@ def run_seg(cfg, *, dataset="hyperkvasir", init, objective, stage, corpus="gastr
         "provenance": provenance(int(cfg.seed), dataset=dataset, init=init, objective=objective,
                                  stage=stage, corpus=corpus, task="hkv_seg"),
     }
+    from ..run_paths import checkpoint_metadata
+    meta = checkpoint_metadata(cfg, objective, init, corpus, run_tag) if stage == 'post' else {'run_tag': ''}
+    res['provenance'].update(meta)
+    for row in res['rows']:
+        row.update(meta)
     out_dir = os.path.expanduser(str(cfg.paths.results))
     ensure_dirs(out_dir)
     fp = os.path.join(out_dir, f"{dataset}__{tag}__hkv_seg.json")
