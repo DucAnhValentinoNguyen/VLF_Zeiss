@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=110G
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --signal=B:USR1@300
 #SBATCH --no-requeue
 #SBATCH --output=lrz/logs/fullstream_%j.out
