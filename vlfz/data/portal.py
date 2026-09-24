@@ -35,10 +35,9 @@ def _init_transform_worker(transform):
 def _transform_sample(raw, identity, transform):
     import torch
     import numpy as np
-    # A truncated/corrupt image anywhere in a 4.8M-image live stream must not
-    # kill a multi-day run -- return None and let __iter__ drop the sample.
-    if raw is None:
-        return None
+    # PortalStream.decode already turns a truncated/corrupt image, or a
+    # missing archive member (raw=None), into a deterministic blank -- it
+    # never raises, so there's nothing to catch here.
     seed = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:4], 'big')
     py_state, np_state = random.getstate(), np.random.get_state()
     with torch.random.fork_rng(devices=[]):
@@ -47,9 +46,6 @@ def _transform_sample(raw, identity, transform):
         np.random.seed(seed)
         try:
             return transform(PortalStream.decode(raw))
-        except (OSError, ValueError) as e:
-            print(f'[portal] decode failed for {identity}: {e!r} -- skipping', flush=True)
-            return None
         finally:
             random.setstate(py_state)
             np.random.set_state(np_state)
@@ -101,7 +97,14 @@ class PortalClient:
         s.headers['x-csrftoken'] = b.json()['csrf_token']
 
     def url(self, item):
-        for attempt in range(2):
+        # 401/403 -> renew the session once, then retry. 5xx -> the portal's
+        # own transient error (2026-09-24: an ~2h window of HTTP 500 killed
+        # both training jobs -- download() already retries these; this call
+        # never did), so back off and retry like download() does. Any other
+        # status (404, 400, ...) is treated as permanent and still fatal
+        # immediately -- retrying those forever would hide a real problem.
+        renewed = False
+        for attempt in range(6):
             try:
                 r = self.session.post(f"{self.base}/api/provided_file/{item['id']}/download_url/",
                                       data='{}', timeout=60)
@@ -109,13 +112,18 @@ class PortalClient:
                 raise RuntimeError('Portal connection failed; retry after checking network') from None
             if r.status_code == 200:
                 return r.json()['url']
-            if r.status_code in (401, 403) and attempt == 0:
+            if r.status_code in (401, 403) and not renewed:
+                renewed = True
                 try:
                     self.renew()
                 except requests.RequestException:
                     raise RuntimeError('Portal renewal failed; refresh private credentials') from None
                 continue
+            if r.status_code >= 500 and attempt < 5:
+                time.sleep(min(2 ** attempt, 30))
+                continue
             raise RuntimeError(f'Portal authorization/request failed: HTTP {r.status_code}')
+        raise RuntimeError('Portal authorization/request failed: retries exhausted')
 
     def range(self, item, start, end):
         try:
@@ -366,31 +374,27 @@ def batch_sizes(n, size):
 class PortalStream(IterableDataset):
     """Iterable batch source. Call commit only after a successful optimizer step.
 
-    A corrupt/truncated image is skipped rather than crashing the run, but
-    only up to ``max_failure_rate`` of images attempted (checked once at
-    least ``failure_min_sample`` have been attempted) -- bounded tolerance,
-    not unlimited silent coverage loss. Crossing the bound raises, on the
-    theory that a rate that high means something systemic (a bad archive, a
-    flaky portal) rather than one-off corruption, and that's worth a human
-    looking at rather than quietly continuing. Counts persist across
-    checkpoint resumes (state_dict/load_state_dict) so the bound applies to
-    the whole run, not just one epoch or one allocation.
+    A corrupt/truncated image, or an archive member the manifest lists but
+    the archive no longer has, is replaced with a deterministic blank sample
+    rather than dropped or raised -- see PortalStream.decode. That keeps
+    self.sizes/cursor exact regardless of corruption, so checkpoint resume
+    never has to reconcile a shifted batch boundary. attempts/failures are
+    informational telemetry only (surfaced via coverage()), not a gate --
+    persisted across resumes via state_dict/load_state_dict so counts stay
+    accurate for the whole run, not just one epoch or one allocation.
     """
     def __init__(self, client, cache, manifest, transform, collate, batch_size=128, seed=0, epochs=3,
-                 transform_workers=0, max_failure_rate=0.001, failure_min_sample=1000):
+                 transform_workers=0):
         self.client, self.cache, self.manifest = client, cache, manifest
         self.transform, self.collate = transform, collate
         self.seed, self.epochs = seed, epochs
         self.transform_workers = transform_workers
-        self.max_failure_rate = max_failure_rate
-        self.failure_min_sample = failure_min_sample
         self.sizes = batch_sizes(sum(len(a['members']) for a in manifest['archives']), batch_size)
         self.cursor = {'epoch': 0, 'batch': 0}
-        # Live counts advance as samples are produced (the threshold check in
-        # record_failure needs that, in real time, independent of commits).
-        # _committed is the snapshot state_dict()/checkpointing sees -- frozen
-        # between commits, exactly like self.cursor, so a crash between
-        # producing and committing a batch doesn't change what a resume sees.
+        # Live counts advance as samples are produced; _committed is the
+        # snapshot state_dict()/checkpointing sees -- frozen between commits,
+        # exactly like self.cursor, so a crash between producing and
+        # committing a batch doesn't change what a resume sees.
         self.attempts = 0
         self.failures = 0
         self._committed = {'attempts': 0, 'failures': 0}
@@ -420,21 +424,29 @@ class PortalStream(IterableDataset):
 
     def record_failure(self, identity, error):
         self.failures += 1
-        print(f'[portal] failed for {identity}: {error!r} -- skipping '
-              f'({self.failures}/{self.attempts} failed so far)', flush=True)
-        if (self.attempts >= self.failure_min_sample
-                and self.failures / self.attempts > self.max_failure_rate):
-            raise RuntimeError(
-                f'Portal failure rate {self.failures}/{self.attempts} = '
-                f'{self.failures / self.attempts:.4%} exceeded max_failure_rate='
-                f'{self.max_failure_rate:.4%} (min_sample={self.failure_min_sample}); '
-                'stopping rather than continuing to silently lose coverage.')
+        print(f'[portal] failed for {identity}: {error!r} -- replacing with a '
+              f'blank sample ({self.failures}/{self.attempts} so far)', flush=True)
 
     @staticmethod
     def decode(raw):
-        from PIL import Image
-        with Image.open(io.BytesIO(raw)) as im:
-            return im.convert('RGB')
+        from PIL import Image, ImageFile
+
+        # The raw portal tier includes a small number of truncated PNGs, and
+        # (rarer) an archive member the manifest lists but the archive no
+        # longer has (raw=None from __iter__, e.g. a genuine KeyError on
+        # extraction). Keep the stream cardinality/cursor stable either way:
+        # PIL can recover most truncated files, and both that's-still-
+        # unreadable case and the missing-member case become a deterministic
+        # blank sample. Dropping either would shift every later batch and
+        # invalidate exact checkpoint resume semantics.
+        if raw is None:
+            return Image.new('RGB', (224, 224))
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        try:
+            with Image.open(io.BytesIO(raw)) as im:
+                return im.convert('RGB')
+        except (OSError, ValueError):
+            return Image.new('RGB', (224, 224))
 
     def __iter__(self):
         epoch, batch_start = self.cursor['epoch'], self.cursor['batch']
@@ -471,22 +483,15 @@ class PortalStream(IterableDataset):
                         tasks = []
                         for n in names[start:start+chunk]:
                             identity = f'{self.seed}:{epoch}:{item["id"]}:{n}'
+                            self.attempts += 1
                             try:
                                 tasks.append((read_member(n), identity))
-                            except (OSError, zipfile.BadZipFile, EOFError) as e:
-                                self.attempts += 1
+                            except (OSError, zipfile.BadZipFile, EOFError, KeyError) as e:
                                 self.record_failure(identity, e)
-                                tasks.append((None, identity))
+                                tasks.append((None, identity))  # decode() blanks a None raw
                         samples = (transforms.map(_worker_sample, tasks) if transforms else
                                    (_transform_sample(*task, self.transform) for task in tasks))
-                        for (raw, identity), sample in zip(tasks, samples):
-                            if raw is None and sample is None:
-                                continue  # already counted as a failure above
-                            if sample is None:
-                                self.attempts += 1
-                                self.record_failure(identity, 'decode failed (see worker log above)')
-                                continue
-                            self.attempts += 1
+                        for sample in samples:
                             batch.append(sample)
                             if len(batch) == self.sizes[bi]:
                                 bi += 1

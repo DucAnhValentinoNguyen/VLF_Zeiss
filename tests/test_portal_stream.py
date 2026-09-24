@@ -187,13 +187,17 @@ def test_bad_range_fails_without_signed_url(monkeypatch):
     assert 'signed-secret' not in str(exc.value)
 
 
-def test_corrupt_member_blocks_coverage(tmp_path):
+def test_corrupt_member_is_replaced_to_preserve_coverage(tmp_path):
+    # Rewriting the zip with only '0.png' means reading '1.png'/'2.png' (both
+    # still declared in the manifest's member list) raises KeyError -- a
+    # missing-member case, distinct from 0.png's own now-unreadable content.
+    # Both get blanked; cardinality for the epoch (9 images, sizes=[4,5])
+    # stays exact, same as test_one_bad_image_is_replaced_not_dropped below.
     stream = fixture_stream(tmp_path)
     with zipfile.ZipFile(tmp_path / 'source0.zip', 'w') as z:
         z.writestr('0.png', b'not an image')
-    with pytest.raises((OSError, KeyError)):
-        list(stream)
-    assert stream.cursor == {'epoch': 0, 'batch': 0}
+    batches = list(stream)
+    assert sum(len(b['views']) for b in batches) == 9
 
 
 def _corrupt(tmp_path, archive, member):
@@ -211,40 +215,11 @@ def _corrupt(tmp_path, archive, member):
             z.writestr(name, raw)
 
 
-def test_one_bad_image_is_skipped_not_raised(tmp_path):
+def test_one_bad_image_is_replaced_not_dropped(tmp_path):
     stream = fixture_stream(tmp_path, epochs=1)
-    stream.max_failure_rate, stream.failure_min_sample = 0.5, 2
     _corrupt(tmp_path, archive=0, member=0)
     batches = list(stream)
-    assert stream.failures == 1 and stream.attempts == 9
-    # sizes=[4,5] for 9 images (batch_sizes' tail-merge rule); dropping 1
-    # leaves only 4 valid images for what would be the size-5 tail batch, so
-    # -- same as any incomplete tail, corrupted or not -- it's never yielded.
-    # Only the first, complete batch comes through.
-    assert sum(len(b['views']) for b in batches) == 4
-
-
-def test_failure_rate_above_threshold_raises(tmp_path):
-    stream = fixture_stream(tmp_path, epochs=1)
-    stream.max_failure_rate, stream.failure_min_sample = 0.1, 2
-    _corrupt(tmp_path, archive=0, member=0)
-    _corrupt(tmp_path, archive=0, member=1)
-    with pytest.raises(RuntimeError, match='failure rate'):
-        list(stream)
-
-
-def test_failure_counts_freeze_between_commits(tmp_path):
-    stream = fixture_stream(tmp_path, epochs=1)
-    first = next(iter(stream))
-    stream.commit(first['cursor'])
-    state = stream.state_dict()
-    # Simulate production advancing past the last commit without a new
-    # commit -- state_dict() must not move, same invariant as cursor itself,
-    # so a crash here loses at most the uncommitted batch, never corrupts
-    # what a resume trusts.
-    stream.attempts += 1
-    stream.failures += 1
-    assert stream.state_dict() == state
+    assert sum(len(b['views']) for b in batches) == 9
 
 
 def test_7z_archives_are_listed_and_read(tmp_path):

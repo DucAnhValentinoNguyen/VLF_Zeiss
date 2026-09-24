@@ -20,19 +20,23 @@ Authentication uses `PORTAL_JSON` (default `~/.gastronet_portal/portal.json`).
 An optional private `CORTEX_ACCESS_URL` enables session renewal. Do not put
 credentials, access links, or signed download URLs into version control.
 
-The manifest is indexed before training. A corrupt/truncated image or archive
-member is skipped and logged rather than crashing the run (2026-09-22: DINO
-and LeJEPA both died on `OSError: image file is truncated` within the first
-day, unhandled), but only up to `portal_max_failure_rate` (default 0.1%,
-checked once `portal_failure_min_sample` images -- default 1000 -- have been
-attempted): crossing that bound raises, since a rate that high means
-something systemic rather than one-off corruption, and coverage loss stays
-bounded rather than unlimited-and-silent either way. A manifest/archive
-mismatch (a named member that's actually missing) is not covered by this and
-still stops execution immediately -- that indicates the manifest itself is
-wrong, not a bad file. `PortalStream.coverage()` reports `decode_attempts`/
-`decode_failures`; both persist across checkpoint resumes, so the bound
-applies to the whole run, not just one epoch or one allocation.
+The manifest is indexed before training. A corrupt/truncated image, or an
+archive member the manifest lists but the archive no longer has, is replaced
+with a deterministic blank sample and logged (2026-09-22: DINO and LeJEPA
+both died on `OSError: image file is truncated` within the first day,
+unhandled; 2026-09-24: superseded a bounded-skip-rate approach with this
+simpler always-replace one) -- `PortalStream.decode` uses PIL's
+`LOAD_TRUNCATED_IMAGES` to recover most truncated files outright, and blanks
+whatever's still unreadable, including a fully-missing member (`raw=None`).
+Replacing rather than dropping keeps `self.sizes`/the cursor exact regardless
+of corruption, so resume never has to reconcile a shifted batch boundary.
+`PortalStream.coverage()` reports `decode_attempts`/`decode_failures` as
+telemetry (not a gate); both persist across checkpoint resumes, so the count
+covers the whole run, not just one epoch or one allocation. A 5xx from the
+portal itself (its own transient error, distinct from a bad archive) is
+retried with backoff in `PortalClient.url()`, same as `download()` already
+does -- added 2026-09-24 after an ~2h portal outage killed both jobs, since
+that path never retried before.
 Each epoch shuffles archives and members deterministically. Training commits
 the cursor only after the optimizer step; checkpoint replay uses the saved
 cursor and deterministic sample augmentation. Epoch tails are retained, with

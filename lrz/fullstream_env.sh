@@ -19,8 +19,16 @@ export GASTRONET_ROOT="$OUT_ROOT/unused_local_corpus"
 export GASTRONET_SOURCE=portal_zip
 export INIT=imagenet CORPUS=gastronet STAGE=full SSL_EPOCHS=3 BATCH_SIZE=128
 export BASE_LR=1e-4 MIN_LR=1e-6 LLRD=0.75 GRAD_CKPT=false
-# Measured 2026-09-21: GPU util bursty 0-95% (avg low), 19/80GB VRAM used --
-# I/O-bound on the single-worker portal decode path, not GPU-bound. cpus-per-
-# task raised 8->16 alongside this to actually use the extra decode workers.
-export PORTAL_TRANSFORM_WORKERS=8
+# Measured 2026-09-22, on cached archives + live portal range requests:
+#   portal download   ~100 MiB/s on ONE connection (150 MiB/s at 4) -- NOT the
+#                     bottleneck; production was only pulling ~20 MB/s.
+#   decode            18.2 ms/image
+#   +augmentation     47.2 ms/image lejepa, 85.4 ms/image dino  <-- the cost
+# So throughput is CPU augmentation-bound and scales with worker count. At the
+# old 4 workers lejepa managed 0.39 it/s (~60% of the 0.66 theoretical, the
+# rest being IPC/batching/GPU). 12 workers fits the 16 allocated CPUs, leaving
+# 4 for the main process, the download thread and GPU feed, and keeps archive
+# processing (~60s) comfortably slower than the ~38s prefetch download so the
+# single prefetch thread stays ahead.
+export PORTAL_TRANSFORM_WORKERS=12
 source lrz/job_env.sh
