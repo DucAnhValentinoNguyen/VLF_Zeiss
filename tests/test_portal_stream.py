@@ -187,6 +187,73 @@ def test_bad_range_fails_without_signed_url(monkeypatch):
     assert 'signed-secret' not in str(exc.value)
 
 
+class _FakePost:
+    """Feeds PortalClient.url() a scripted sequence of responses through
+    session.post, so its own retry loop runs for real (unlike the `client()`
+    fixture above, which stubs url() out entirely)."""
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls = 0
+
+    def __call__(self, *a, **k):
+        self.calls += 1
+        r = self.replies.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+class _JsonResponse:
+    def __init__(self, status, url=None):
+        self.status_code = status
+        self._url = url
+
+    def json(self):
+        return {'url': self._url}
+
+
+def _url_client(replies):
+    c = object.__new__(PortalClient)
+    c.session = type('S', (), {'post': _FakePost(replies)})()
+    c.base = 'https://example.invalid'
+    return c
+
+
+def test_url_retries_transient_5xx_then_succeeds(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr('vlfz.data.portal.time.sleep', sleeps.append)
+    c = _url_client([_JsonResponse(500), _JsonResponse(502), _JsonResponse(200, 'https://x/signed')])
+    assert c.url({'id': 1}) == 'https://x/signed'
+    assert sleeps == [1, 2]  # exponential backoff: 2**0, 2**1
+
+
+def test_url_retries_network_exception_same_as_5xx(monkeypatch):
+    import requests as _requests
+    monkeypatch.setattr('vlfz.data.portal.time.sleep', lambda _: None)
+    c = _url_client([_requests.ConnectionError('refused'), _JsonResponse(200, 'https://x/signed')])
+    assert c.url({'id': 1}) == 'https://x/signed'
+
+
+def test_url_gives_up_after_the_retry_deadline(monkeypatch):
+    # Jump monotonic() straight past the deadline on the first check instead
+    # of actually sleeping for 3h -- exercises the give-up path, not the wait.
+    monkeypatch.setattr('vlfz.data.portal.time.sleep', lambda _: None)
+    times = iter([0, 10 ** 6])  # deadline = 0 + 3h; next read is way past it
+    monkeypatch.setattr('vlfz.data.portal.time.monotonic', lambda: next(times))
+    c = _url_client([_JsonResponse(500)])
+    with pytest.raises(RuntimeError, match='3h'):
+        c.url({'id': 1})
+
+
+def test_url_does_not_retry_a_permanent_4xx(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr('vlfz.data.portal.time.sleep', sleeps.append)
+    c = _url_client([_JsonResponse(404)])
+    with pytest.raises(RuntimeError, match='404'):
+        c.url({'id': 1})
+    assert sleeps == []  # no retry, no wasted wait on a structural error
+
+
 def test_corrupt_member_is_replaced_to_preserve_coverage(tmp_path):
     # Rewriting the zip with only '0.png' means reading '1.png'/'2.png' (both
     # still declared in the manifest's member list) raises KeyError -- a

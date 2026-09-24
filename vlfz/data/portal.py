@@ -97,33 +97,51 @@ class PortalClient:
         s.headers['x-csrftoken'] = b.json()['csrf_token']
 
     def url(self, item):
-        # 401/403 -> renew the session once, then retry. 5xx -> the portal's
-        # own transient error (2026-09-24: an ~2h window of HTTP 500 killed
-        # both training jobs -- download() already retries these; this call
-        # never did), so back off and retry like download() does. Any other
-        # status (404, 400, ...) is treated as permanent and still fatal
-        # immediately -- retrying those forever would hide a real problem.
+        # 401/403 -> renew the session once, then retry. 5xx or a network
+        # exception -> the portal is transiently unreachable, not wrong (a
+        # real ~2h HTTP 500 window killed both training jobs on 2026-09-24;
+        # download() already retried transient failures, this call never
+        # did, and an earlier version of this fix only budgeted ~31s total,
+        # which would NOT have survived that outage). Retrying costs nothing
+        # -- the GPU allocation is already held either way -- while dying
+        # costs however long it takes a human to notice plus re-entering a
+        # queue that has taken up to 2 days under real contention, so budget
+        # for hours, not seconds. Any OTHER status (404, 400, ...) is still
+        # fatal immediately: that's a real, permanent problem, not a
+        # transient one, and retrying it forever would just hide it.
         renewed = False
-        for attempt in range(6):
+        deadline = time.monotonic() + 3 * 3600  # 3h -- comfortably past the observed 2h outage
+        attempt = 0
+        while True:
             try:
                 r = self.session.post(f"{self.base}/api/provided_file/{item['id']}/download_url/",
                                       data='{}', timeout=60)
-            except requests.RequestException:
-                raise RuntimeError('Portal connection failed; retry after checking network') from None
-            if r.status_code == 200:
-                return r.json()['url']
-            if r.status_code in (401, 403) and not renewed:
-                renewed = True
-                try:
-                    self.renew()
-                except requests.RequestException:
-                    raise RuntimeError('Portal renewal failed; refresh private credentials') from None
-                continue
-            if r.status_code >= 500 and attempt < 5:
-                time.sleep(min(2 ** attempt, 30))
-                continue
-            raise RuntimeError(f'Portal authorization/request failed: HTTP {r.status_code}')
-        raise RuntimeError('Portal authorization/request failed: retries exhausted')
+            except requests.RequestException as e:
+                r = None
+                transient = e
+            else:
+                transient = None
+                if r.status_code == 200:
+                    return r.json()['url']
+                if r.status_code in (401, 403) and not renewed:
+                    renewed = True
+                    try:
+                        self.renew()
+                    except requests.RequestException:
+                        raise RuntimeError('Portal renewal failed; refresh private credentials') from None
+                    continue
+                if r.status_code < 500:
+                    raise RuntimeError(f'Portal authorization/request failed: HTTP {r.status_code}')
+            # Transient (network exception, or a 5xx from the portal itself).
+            if time.monotonic() >= deadline:
+                detail = f'HTTP {r.status_code}' if r is not None else repr(transient)
+                raise RuntimeError(f'Portal still unreachable after 3h of retrying ({detail})')
+            wait = min(2 ** attempt, 300)  # ramps to a 5-minute cap, not 30s
+            print(f'[portal] url() attempt {attempt+1} failed '
+                  f'({"HTTP " + str(r.status_code) if r is not None else repr(transient)}) -- '
+                  f'retrying in {wait}s', flush=True)
+            time.sleep(wait)
+            attempt += 1
 
     def range(self, item, start, end):
         try:
