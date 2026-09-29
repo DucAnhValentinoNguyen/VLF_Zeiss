@@ -1,0 +1,2020 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLF_Zeiss build log</title>
+<style>
+:root {
+  --bg: #fbfaf7;
+  --fg: #1b1c1d;
+  --muted: #5b5f66;
+  --accent: #a3372c;
+  --accent2: #2c5f8a;
+  --rule: #ddd7cb;
+  --card: #ffffff;
+  --code-bg: #f3f1ea;
+  --code-fg: #2b2b2b;
+  --warn-bg: #fff4e2;
+  --warn-fg: #6b4c00;
+  --ok-bg: #eaf5ea;
+  --ok-fg: #285c28;
+  --bad-bg: #fbe9e7;
+  --bad-fg: #7a2b20;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14161a;
+    --fg: #e8e6df;
+    --muted: #9a9d a4;
+    --muted: #9a9da4;
+    --accent: #e2836f;
+    --accent2: #7fb0dd;
+    --rule: #2c2f36;
+    --card: #1b1e24;
+    --code-bg: #101215;
+    --code-fg: #d8dbe0;
+    --warn-bg: #2e2410;
+    --warn-fg: #e0b566;
+    --ok-bg: #142a17;
+    --ok-fg: #8fd39a;
+    --bad-bg: #301613;
+    --bad-fg: #e79488;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14161a;
+  --fg: #e8e6df;
+  --muted: #9a9da4;
+  --accent: #e2836f;
+  --accent2: #7fb0dd;
+  --rule: #2c2f36;
+  --card: #1b1e24;
+  --code-bg: #101215;
+  --code-fg: #d8dbe0;
+  --warn-bg: #2e2410;
+  --warn-fg: #e0b566;
+  --ok-bg: #142a17;
+  --ok-fg: #8fd39a;
+  --bad-bg: #301613;
+  --bad-fg: #e79488;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  font-size: 16px;
+}
+.wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 96px; }
+header.top { border-bottom: 2px solid var(--rule); padding-bottom: 18px; margin-bottom: 24px; }
+h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+h1 .sub { display:block; font-size: 0.95rem; font-weight: 400; color: var(--muted); margin-top: 4px; }
+h2 { font-size: 1.32rem; margin-top: 2.6em; border-top: 1px solid var(--rule); padding-top: 0.9em; }
+h3 { font-size: 1.08rem; margin-top: 1.8em; color: var(--fg); }
+h4 { font-size: 0.98rem; margin-top: 1.4em; color: var(--accent2); }
+p { margin: 0.8em 0; }
+a { color: var(--accent2); }
+.callout {
+  background: var(--warn-bg); color: var(--warn-fg);
+  border: 1px solid var(--rule); border-left: 4px solid var(--accent);
+  border-radius: 6px; padding: 12px 16px; margin: 0 0 8px; font-size: 0.95rem;
+}
+.callout strong { display:block; margin-bottom: 2px; }
+nav.toc {
+  background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 14px 18px; margin: 18px 0 8px; font-size: 0.93rem;
+}
+nav.toc h2 { margin-top: 0; border-top: none; padding-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+nav.toc ol { margin: 0; padding-left: 1.2em; }
+nav.toc li { margin: 3px 0; }
+.codehdr {
+  font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted);
+  background: var(--card); border: 1px solid var(--rule); border-bottom: none;
+  padding: 5px 10px; border-radius: 6px 6px 0 0; letter-spacing: 0.01em;
+}
+pre {
+  background: var(--code-bg); color: var(--code-fg);
+  border: 1px solid var(--rule); border-radius: 0 0 6px 6px;
+  padding: 12px 14px; overflow-x: auto; margin: 0 0 1.1em;
+  font-size: 0.82rem; line-height: 1.48;
+}
+pre + p, pre + h4 { margin-top: 1em; }
+code { font-family: var(--font-mono); }
+p code, li code, td code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.88em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.87rem; }
+th, td { border: 1px solid var(--rule); padding: 6px 9px; text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+thead th { background: var(--card); color: var(--muted); font-weight: 600; }
+.pos { color: var(--ok-fg); }
+.neg { color: var(--bad-fg); }
+.bug {
+  border: 1px solid var(--rule); border-left: 4px solid var(--accent2);
+  border-radius: 6px; padding: 14px 18px; margin: 1.4em 0; background: var(--card);
+}
+.bug h3 { margin-top: 0; }
+.bug .tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+  background: var(--bad-bg); color: var(--bad-fg); vertical-align: middle;
+}
+.commit {
+  font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted);
+  background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+}
+.win { background: var(--ok-bg); color: var(--ok-fg); }
+.lose { background: var(--bad-bg); color: var(--bad-fg); }
+.kv { font-family: var(--font-mono); font-size: 0.85rem; }
+footer { margin-top: 4em; padding-top: 1em; border-top: 1px solid var(--rule); color: var(--muted); font-size: 0.85rem; }
+hr.sep { border: none; border-top: 1px dashed var(--rule); margin: 2em 0; }
+ul, ol { padding-left: 1.4em; }
+li { margin: 0.35em 0; }
+.small { font-size: 0.85rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+<h1>VLF_Zeiss &mdash; Internal Build Log
+<span class="sub">Offline engineering diary &amp; annotated source walkthrough. Repo state as of commit <span class="commit">3b7b3a4</span>, 2026-09-30.</span>
+</h1>
+</header>
+
+<div class="callout">
+<strong>Personal reference only.</strong>
+Not published, not linked from the live site, not part of <code>DucAnhValentinoNguyen.github.io</code>. This file lives at
+<code>docs/full-corpus-buildlog.html</code> in the VLF_Zeiss repo and is meant to be reopened by me, later, to remember exactly
+how and why this was built &mdash; it assumes I already know the code and just need my own reasoning played back to me.
+</div>
+
+<nav class="toc">
+<h2>Contents</h2>
+<ol>
+<li><a href="#narrative">Chronological narrative: the three pivots</a></li>
+<li><a href="#warstories">Debugging war stories</a></li>
+<li><a href="#metadata">Training metadata &amp; crash log (full corpus phase)</a></li>
+<li><a href="#codewalk">Code walkthrough</a></li>
+<li><a href="#pipeline">Training pipeline: how the full run was actually launched</a></li>
+<li><a href="#results">Final results &amp; foundation-model promotion</a></li>
+</ol>
+</nav>
+
+<h2 id="narrative">1. Chronological narrative: the three pivots</h2>
+
+<p>Three pivots shaped this project, each forced by something concrete (storage, a losing init, a
+compute-allocation goal), not by taste. <code>docs/PLAN.md</code> has the blow-by-blow; this is the
+condensed why, in order.</p>
+
+<h3>1.1 REAL-Colon &rarr; HyperKvasir (2026-09-03)</h3>
+<p>The original eval target was REAL-Colon (946&nbsp;GB). Both DSS containers for project <code>pr74ze</code>
+were already full (<code>pr74ze-dss-0001</code> at 199/200&nbsp;GB, <code>pr74ze-dss-0000</code> over quota) &mdash;
+there was nowhere to put it. GastroNet-5M (the intended SSL corpus) also turned out not to be on HuggingFace
+despite an initial assumption; it lives behind a data-use agreement on <code>cortex.thetavision.nl</code>
+("the portal"), which I had authorisation for. HyperKvasir was already staged read-only on DSS
+(<code>pr74ze-dss-0001/ra82sat2/zeiss_data</code>), so it became the eval set: zero-shot on
+<code>hkv_findings</code> (23-way, later 20-way after taxonomy cleanup), <code>hkv_category</code> (4-way),
+<code>hkv_tract</code> (2-way, upper vs lower GI), <code>hkv_pathology</code> (2-way), plus
+<code>hkv_seg</code> (zero-shot polyp segmentation, dense-feature k-NN label transfer on 1000 mask pairs).
+<code>vlfz/data/realcolon.py</code> was kept, unused, dormant code &mdash; not deleted, in case storage ever
+frees up.</p>
+
+<h3>1.2 Four settings &rarr; two settings: SigLIP-2 dropped (2026-09-16)</h3>
+<p>The original design compared two SSL objectives (LeJEPA, DINO v1) crossed with two backbone inits
+(SigLIP-2, ImageNet ViT-B/16) &mdash; four settings. The first complete 4-setting result (on a curated
+~581k-image / 12% subset of GastroNet-5M) showed SigLIP-2 losing to ImageNet on <em>every</em> pre-SSL task,
+and LeJEPA/ImageNet regressing severely post-SSL. Given that, and wanting a fair comparison against a
+teammate&rsquo;s ImageNet-init pipeline (<code>lilian70nn/Endoscopy</code>), the decision was to drop
+SigLIP-2 entirely and put all compute into ImageNet-init LeJEPA vs DINO. This halved the SSL matrix from
+four settings to two. SigLIP-2 code paths (<code>vlfz/models/vit_backbone.py</code>&rsquo;s
+<code>VALID_INITS</code>, <code>load_weights.py</code>&rsquo;s <code>openclip_siglip2_trunk</code>, the
+<code>choices=["siglip2","imagenet"]</code> CLI flags) were left in place, dormant, same pattern as
+REAL-Colon &mdash; only the default init and the sweep loops changed.</p>
+
+<h3>1.3 Curated 12% subset &rarr; the full ~4.9M-image raw corpus, streamed (2026-09-16 &rarr; 09-22)</h3>
+<p>The subset run above was explicitly provisional: 60 shards / 581k images out of GastroNet-5M&rsquo;s
+full ~4.9M. The stated end goal was always a durable foundation-model checkpoint, and a checkpoint trained
+on 12% of the available unlabeled corpus is a weaker artifact than one need be. The original curated-ingest
+plan (<code>portal_to_wds.py</code>: download a portal zip, resize to 224px, JPEG re-encode, phash-dedup,
+write into permanent <code>.tar</code> WebDataset shards, delete the raw zip) produces a compact
+&sim;68&nbsp;GB tier for all 506 archives &mdash; but that ingest itself is a multi-hour-per-batch background
+job with its own failure surface (see <span class="commit">22df058</span> below), and re-encoding pixels once
+throws away information a from-scratch SSL run doesn&rsquo;t need to lose.</p>
+<p>Comparing directly against the teammate&rsquo;s <code>cortex_dataloader.py</code> (fetched and read) settled
+it: her approach streams a zip, decodes straight from the raw zip bytes at full resolution, yields, deletes,
+moves to the next zip &mdash; no local curation step at all. <code>vlfz/data/portal.py</code>
+(<span class="commit">916a684</span> onward) is the from-scratch equivalent of that: a resumable, bounded-disk,
+checkpoint-safe iterable stream directly over the 506 raw portal zips, no permanent local copy of the corpus at
+all. This is what the codebase calls "fullstream." Section&nbsp;4 below walks through it end to end.</p>
+<p>Two secondary decisions from the same session, recorded so they don&rsquo;t get re-litigated: multi-GPU
+(<code>--gres=gpu:2/4</code>) was investigated and explicitly <strong>not</strong> pursued &mdash; DINO&rsquo;s
+teacher-output centering (<code>update_center</code> in <code>dino_lib.py</code>) batch-means locally with no
+<code>dist.all_reduce</code>, and LeJEPA&rsquo;s SIGReg term is a per-batch distribution statistic; under naive
+DDP each rank would silently compute a different center / a noisier regularizer estimate than intended, and
+fixing that correctly was judged its own sub-project not worth the schedule risk. And GastroNet-5M EDA was
+explicitly deferred until the full corpus finished ingesting, rather than doing a partial pass now and a
+redo later.</p>
+<hr class="sep">
+
+<h2 id="warstories">2. Debugging war stories</h2>
+<p>In chronological order. Each entry: what broke, how it surfaced, the actual fix, why the fix works.
+These are the bugs that actually cost wall-clock time or silently corrupted a result &mdash; not every
+commit, just the ones worth remembering the shape of.</p>
+<div class="bug"><h3>The frozen global_step / dead first full run<span class="tag">ccb8985</span><span class="tag">silent failure</span></h3>
+<p><strong>Symptom.</strong> The first full LeJEPA/ImageNet SSL run "completed" &mdash; no crash, no error
+&mdash; but TensorBoard showed <code>lr</code> flat at exactly 0.0 and <code>loss</code> flat at 0.737 across
+10k logged steps. It had trained on nothing.</p>
+<p><strong>Root cause, two independent bugs stacked:</strong></p>
+<ol>
+<li><code>training_step</code> called <code>opt.optimizer.step()</code> &mdash; the <em>raw</em>
+<code>torch.optim.AdamW.step()</code> &mdash; instead of <code>opt.step()</code> (the
+<code>LightningOptimizer</code> wrapper that routes through <code>Strategy.optimizer_step</code>). This had
+been a deliberate workaround for an intermittent CPU-login-node hang around the optimizer step, kept as a
+blanket "defense in depth" measure. But bypassing <code>LightningOptimizer</code> means
+<code>trainer.global_step</code> never increments. <code>cosine_lr(global_step=...)</code> then never leaves
+warmup step 0, so every param group&rsquo;s LR is scaled by 0 forever. Nothing learns.</li>
+<li>Separately, <code>ModelCheckpoint(every_n_train_steps=...)</code> also keys off <code>global_step</code>
+&mdash; so with (1) in place, no <code>last.ckpt</code> or periodic checkpoint was ever written either. A
+crash would have lost <em>everything</em>, not just resumed from a stale point.</li>
+<li>A third, independent bug in the same commit: <code>webdataset_loader</code> called
+<code>ds.with_epoch(steps_per_epoch)</code> on the WebDataset pipeline <em>before</em> the DataLoader
+fan-out across workers. With <code>num_workers=N</code>, the entire dataset pipeline runs inside
+<em>every</em> worker process, so <code>with_epoch(k)</code> yields <code>N&middot;k</code> batches per
+Lightning epoch, not <code>k</code>. At <code>N=12</code> that turned a nominal epoch into ~56k batches
+(~5h) &mdash; long enough that <code>on_train_epoch_end</code> (the other place a checkpoint could fire)
+never ran within the wall-clock budget either.</li>
+</ol>
+<p><strong>Fix (commit <span class="commit">ccb8985</span>).</strong> Route through
+<code>opt.step()</code> whenever CUDA is available (the raw bypass is now CPU-smoke-only, where the
+original hang was actually observed and GPU never reproduced it). And apply <code>.with_epoch()</code> on
+the <code>WebLoader</code> object, which sits <em>after</em> the multiprocessing fan-in, so it bounds the
+combined stream rather than each worker&rsquo;s private copy of it. Verified post-fix: requesting 40 batches
+yields exactly 40, stable across epochs, at <code>num_workers=4</code>.</p>
+<p><strong>Why this matters for reading old results:</strong> any result recorded before
+<span class="commit">ccb8985</span> landed (2026-09-08) from a <em>full</em>-stage run is suspect by
+construction &mdash; the model literally could not have moved.</p>
+</div><div class="bug"><h3>TIMEOUT vs. clean exit: the self-resubmit that only fired half the time<span class="tag">c0be0e6</span><span class="tag">SLURM</span></h3>
+<p><strong>Symptom.</strong> Two 3-epoch SSL runs (LeJEPA/ImageNet, DINO/SigLIP-2) landed on
+<code>lrz-hgx-h100-003</code>, a node running at 0.23&nbsp;it/s &mdash; roughly 11&times; slower than a
+healthy A100 (2.65&nbsp;it/s). Both hit the then-6h wall at epoch&nbsp;1 and simply stopped. No resubmit
+happened.</p>
+<p><strong>Root cause.</strong> The original sbatch script&rsquo;s resubmit logic was a trailing shell
+block after the <code>python -m vlfz.ssl.pretrain</code> line: <code>if [ -f DONE ]; then ...; else sbatch
+$0; fi</code>. That only executes on a <em>clean</em> process exit. A SLURM wall-time TIMEOUT sends
+SIGTERM/SIGKILL straight to the python process; the shell script&rsquo;s own line is killed with it, so the
+trailing resubmit code never runs. "Self-resubmitting" was true only for failures the process itself chose
+to exit from, not for the actual timeout case it existed to handle.</p>
+<p><strong>Fix (commit <span class="commit">c0be0e6</span>).</strong> Move the resubmit logic into a
+<code>trap finish EXIT</code> handler, which fires on <em>any</em> shell exit path, TIMEOUT included &mdash;
+paired with <code>#SBATCH --signal=B:TERM@180</code>, which asks SLURM to deliver SIGTERM 3 minutes before
+the hard kill so the trap has time to run and decide whether to resubmit (only if <code>last.ckpt</code>
+exists, i.e. forward progress was actually made; otherwise it&rsquo;s left for inspection rather than
+resubmitted blindly). The degraded node was also excluded via <code>--exclude=lrz-hgx-h100-003</code> until
+fixed.</p>
+<p class="small"><strong>This exact asymmetry resurfaced during the full-corpus phase</strong> (see
+&sect;3 below, job <code>5808423</code>): a LeJEPA fullstream job hit the hard 48h SLURM TIMEOUT and did
+<em>not</em> self-resubmit, requiring a manual <code>sbatch</code> afterwards, even though
+<code>lrz/sbatch_fullstream.sbatch</code> uses the equivalent trap-based mechanism
+(<code>trap '...kill -USR1 "$child"...' USR1</code> plus <code>#SBATCH --signal=B:USR1@300</code>). The
+companion DINO job resubmitted itself cleanly on the same kind of wall-time exhaustion. I did not fully
+root-cause why LeJEPA&rsquo;s trap didn&rsquo;t fire that particular time &mdash; noting this honestly rather
+than inventing an explanation; see &sect;3.4.</p>
+</div><div class="bug"><h3>Resume re-running a fresh N epochs instead of continuing from global_step<span class="tag">f898184</span></h3>
+<p><strong>Symptom.</strong> LeJEPA/ImageNet (job <code>5776887</code>) TIMEOUT&rsquo;d at 1 epoch, resumed
+as <code>5778010</code>, and ended up doing ~3 <em>more</em> epochs on top &mdash; final
+<code>global_step</code> ~18561 (~4 epochs) against the intended 14061 (3 epochs), while the other three
+settings in the same 4-way comparison got exactly 3.</p>
+<p><strong>Root cause.</strong> The trainer was configured with <code>max_epochs=epochs</code>. On resume
+from <code>last.ckpt</code>, Lightning correctly restores <code>trainer.global_step</code>, but the
+WebDataset-backed iterable dataloader&rsquo;s own epoch counter is not part of that checkpoint state and
+resets to 0. So <code>max_epochs=3</code> after a resume means "3 more epochs from here," not "3 epochs
+total."</p>
+<p><strong>Fix (commit <span class="commit">f898184</span>).</strong> Bound training on an absolute step
+count instead: <code>max_epochs=-1, max_steps=(args.limit_steps or total_steps)</code>, where
+<code>total_steps = epochs * steps_per_epoch</code> is computed once up front. "3 epochs" now means exactly
+<code>3 &times; steps_per_epoch</code> optimizer steps, regardless of how many separate SLURM allocations
+that took to accumulate. The already-overrun LeJEPA/ImageNet run from before this fix was not silently kept
+&mdash; it&rsquo;s flagged as a ~4-epoch outlier in the results rather than presented as comparable.</p>
+</div><div class="bug"><h3>Home quota exhaustion mid-checkpoint<span class="tag">af991d3</span><span class="tag">e7f9df3</span></h3>
+<p><strong>Symptom.</strong> A DINO/SigLIP-2 resume (job <code>5778011</code>) died with
+<code>OSError: [Errno 28] No space left on device</code> partway through writing a checkpoint. Separately,
+a dense crash-loop on 2026-09-14 (job IDs <code>5788346</code> onward, ~4 minutes apart, dozens of FAILED
+attempts) hit the same wall repeatedly &mdash; confirmed directly from
+<code>lrz/logs/vlfz_ssl_5788346.err</code>, which ends in:</p>
+<div class="codehdr">lrz/logs/vlfz_ssl_5788346.err (tail, real traceback)</div>
+<pre><code>File "tensorboard/compat/tensorflow_stub/io/gfile.py", line 171, in _write
+    with io.open(filename, mode, encoding=encoding) as f:
+OSError: [Errno 122] Disk quota exceeded</code></pre>
+<p>i.e. even TensorBoard&rsquo;s own event-file flush was failing &mdash; the home filesystem quota was
+completely full, not just tight.</p>
+<p><strong>Root cause.</strong> Four SSL run directories, each holding a resume checkpoint
+(<code>last.ckpt</code>, ~1.4&nbsp;GB) <em>plus</em> a periodic snapshot (<code>ckpt-step=*.ckpt</code>,
+another ~1.4&nbsp;GB), came to roughly 11&nbsp;GB &mdash; against a ~55&nbsp;GB home quota already carrying
+other project data. Eval only ever reads <code>ema_backbone.pt</code> (~0.3&nbsp;GB); the two Lightning
+resume checkpoints are pure dead weight once a run is <code>DONE</code>, but nothing was removing them.</p>
+<p><strong>Fix, two parts.</strong></p>
+<ul>
+<li><code>af991d3</code>: moved <code>OUT_ROOT</code> off the home quota entirely, onto
+<code>$MCMLSCRATCH/vlf_zeiss_runs</code> (with <code>~/vlf_zeiss_runs</code> left as a symlink for
+convenience) &mdash; more headroom, and a different quota pool than home.</li>
+<li><code>e7f9df3</code>: after a run reaches <code>DONE</code>, delete <code>last.ckpt</code> and every
+<code>ckpt-*.ckpt</code> in its output directory, keeping only <code>ema_backbone.pt</code> + the
+TensorBoard log dir + the <code>DONE</code> flag. See the code excerpt in &sect;4.3.</li>
+</ul>
+<p>The full-corpus ("fullstream") phase later moved outputs to a real home directory again
+(<code>$HOME/vlf_zeiss_fullstream</code>, deliberately <em>not</em> the historical
+<code>vlf_zeiss_runs</code> symlink) with its own explicit preflight quota check before training starts
+(<code>fullstream.py::preflight</code>, &sect;4.2) &mdash; a direct, permanent response to having been burned
+by this exact failure mode twice.</p>
+</div><div class="bug"><h3>Corrupt / truncated portal images: three iterations to the final design<span class="tag">916a684</span><span class="tag">22df058</span><span class="tag">84a6d16</span><span class="tag">26c315e</span></h3>
+<p>This bug went through three distinct designs before settling. Worth keeping all three in mind, since the
+final shape only makes sense in light of what the first two got wrong.</p>
+<h4>Iteration 1 &mdash; crash (discovered the hard way)</h4>
+<p>DINO&rsquo;s full fullstream run died 8500 steps in on an uncaught
+<code>OSError: image file is truncated</code>, raised from inside <code>PortalStream.decode</code> with no
+guard at all. Confirmed directly in <code>full_dino.log</code>:</p>
+<div class="codehdr">$HOME/vlf_zeiss_fullstream/full_dino.log (real traceback, step ~8583, job 5799991/5799992-era)</div>
+<pre><code>File ".../vlfz/data/portal.py", line 52, in _worker_sample
+    return _transform_sample(*task, _worker_transform)
+  File ".../vlfz/data/portal.py", line 45, in _transform_sample
+    return transform(PortalStream.decode(raw))
+  File ".../vlfz/data/portal.py", line 393, in decode
+    return im.convert('RGB')
+  File ".../PIL/ImageFile.py", line 399, in load
+    raise OSError(msg) from e
+OSError: image file is truncated</code></pre>
+<p>Separately, the same failure class already existed in the (older, curation-based) ingest path
+(<code>pipeline/ingest/portal_to_wds.py</code>): one corrupt zip raised an uncaught
+<code>zipfile.BadZipFile</code> and killed a multi-hour backfill at shard 69/506
+(commit <span class="commit">22df058</span>) &mdash; fixed there by catching, logging to
+<code>_failed.txt</code>, and continuing without marking the shard done (so a later backfill retries it).</p>
+<h4>Iteration 2 &mdash; bounded skip rate (84a6d16)</h4>
+<p><code>916a684</code>&rsquo;s first fix for the streaming path was an unconditional skip: catch, log,
+drop the sample, move on. That silently diverged from <code>docs/FULLSTREAM.md</code>&rsquo;s documented
+policy ("corrupt images stop execution") without saying so anywhere. <code>84a6d16</code> replaced it with a
+bounded tolerance: skip and count via <code>PortalStream.attempts</code>/<code>failures</code>, but hard-fail
+if the failure rate exceeds <code>portal_max_failure_rate</code> (default 0.1%) once at least
+<code>portal_failure_min_sample</code> (default 1000) images have been attempted. The reasoning at the time:
+neither "one bad image kills a 3-day run" nor "silently lose an unknown amount of data forever" was
+acceptable, so bound the loss instead of picking one of those two failure modes.</p>
+<h4>Iteration 3 &mdash; always blank, never drop (26c315e, final)</h4>
+<p>The bounded-skip design worked but complicated <code>__iter__</code>&rsquo;s batch-accumulation loop
+(a dropped sample means the batch can come up short, which interacts with exact-cardinality resume). A
+simpler redesign replaced skip-and-count with <strong>always replace with a deterministic blank
+sample</strong> &mdash; <code>PortalStream.decode</code> now never raises: a truncated image that
+PIL&rsquo;s <code>ImageFile.LOAD_TRUNCATED_IMAGES = True</code> cannot recover, or a completely missing
+archive member (<code>raw=None</code>, a real <code>KeyError</code> from extraction), both become
+<code>Image.new('RGB', (224, 224))</code>. This is strictly better for the property that actually matters
+for checkpoint-resume correctness: <code>self.sizes</code> (the per-batch sample counts) and the cursor stay
+exactly right regardless of how many images were bad, so resume never has to reconcile a shifted batch
+boundary. The bounded-failure-rate machinery from iteration 2 (now fully dead code &mdash; nothing produces
+<code>None</code> for it to gate) was removed outright rather than left dormant, since it was actively
+wrong by this point, not just unused. <code>attempts</code>/<code>failures</code> remain as plain telemetry
+via <code>coverage()</code>, persisted across resumes.</p>
+<p>Final measured impact: 0 decode failures across all 13,383,770 decode attempts on the winning DINO run
+(see <a href="#results">&sect;6</a>) &mdash; the corpus, once actually swept in full, turned out to be clean;
+the machinery exists for the tail risk, not because it fired often.</p>
+</div><div class="bug"><h3>Portal HTTP 5xx outage: url() never retried, only download() did<span class="tag">3b7b3a4</span></h3>
+<p><strong>Symptom.</strong> An ~2-hour window of the portal returning HTTP&nbsp;500 killed both training
+jobs on 2026-09-24. Confirmed in <code>full_dino.log</code>:</p>
+<div class="codehdr">$HOME/vlf_zeiss_fullstream/full_dino.log (real traceback, jobs 5801249/5802400-era)</div>
+<pre><code>File ".../vlfz/data/portal.py", line 145, in download
+    with requests.get(self.url(item), headers={'Range': f'bytes={have}-'},
+  File ".../vlfz/data/portal.py", line 118, in url
+    raise RuntimeError(f'Portal authorization/request failed: HTTP {r.status_code}')
+RuntimeError: Portal authorization/request failed: HTTP 500</code></pre>
+<p><strong>Root cause.</strong> <code>PortalClient.download()</code> already retried transient failures
+with exponential backoff (up to 6 attempts). But <code>download()</code> gets the actual signed download
+URL by calling <code>self.url(item)</code> first, and <code>url()</code> itself had no retry logic at
+all &mdash; any non-200, non-401/403 response (including a 500 from the portal&rsquo;s own infrastructure,
+nothing to do with this client) was immediately fatal. <code>download()</code>&rsquo;s retry loop was
+retrying a call that itself never gave the outage a chance to pass.</p>
+<p><strong>Fix, two commits, landed 40 minutes apart.</strong></p>
+<ul>
+<li><code>26c315e</code> gave <code>url()</code> its first retry loop: up to 6 attempts, exponential
+backoff capped at 30s, 401/403 still renews the session once first. Total budget: under a minute.</li>
+<li><code>3b7b3a4</code>, the very next commit, found that budget insufficient against the actual outage
+duration and rewrote it: a 3-hour deadline (comfortably past the observed 2-hour outage), backoff ramping
+to a 5-minute cap instead of 30s, and retrying network exceptions (<code>requests.RequestException</code>,
+e.g. a connection reset) the same way as a 5xx status, not just HTTP-level failures. The reasoning, from
+the code comment: retrying costs nothing since the GPU allocation is already held either way, while dying
+costs however long it takes a human to notice <em>plus</em> re-entering a queue that has taken up to 2 days
+under real contention &mdash; so budget for hours, not seconds. Any non-5xx, non-401/403 status (404, 400,
+...) is still immediately fatal: that&rsquo;s a real, permanent problem, and retrying it forever would only
+hide it.</li>
+</ul>
+<p>See &sect;4.1 for the actual <code>url()</code> code as it stands after both fixes.</p>
+</div><hr class="sep">
+<h2 id="metadata">3. Training metadata &amp; crash log (full-corpus phase)</h2>
+<p>This section is the exhaustive record of what it actually took, in SLURM submissions and wall-clock, to
+get the two full-corpus runs (DINO/ImageNet, LeJEPA/ImageNet) to <code>DONE</code>. Numbers below come from
+three sources, all real, none estimated: <code>$HOME/vlf_zeiss_fullstream/foundation_model/CARD.json</code>
+(final step/epoch/provenance counts), <code>sacct -u ra82sat2</code> (job state/timing), and the actual
+training log files (<code>$HOME/vlf_zeiss_fullstream/{pilot,full}_{dino,lejepa}.log</code>, and
+<code>lrz/logs/{fullstream,vlfz_ssl}_&lt;jobid&gt;.{out,err}</code>) grepped for real tracebacks. Where a
+root cause was not fully nailed down, that is stated explicitly rather than papered over.</p>
+
+<h3>3.1 Steps, epochs, images &mdash; per setting</h3>
+<table>
+<thead><tr><th>Setting</th><th>Images/epoch</th><th>Epochs</th><th>Total optimizer steps</th><th>Batch size</th><th>Decode failures</th></tr></thead>
+<tbody>
+<tr><td>DINO / ImageNet (winner)</td><td class="kv">4,823,974</td><td class="kv">3</td><td class="kv">113,064</td><td class="kv">128</td><td class="kv">0 / 13,383,770 attempts</td></tr>
+<tr><td>LeJEPA / ImageNet</td><td class="kv">4,823,974</td><td class="kv">3</td><td class="kv">113,064</td><td class="kv">128</td><td class="kv">not separately recorded in CARD.json (telemetry only, non-gating)</td></tr>
+</tbody>
+</table>
+<p class="small">4,823,974 images/epoch &times; 3 epochs / 128 batch size = 113,064.6 &rarr; 113,064 steps after
+<code>batch_sizes()</code>&rsquo;s tail-merge rule (the last short batch of an epoch is folded into the
+previous full batch rather than run as its own undersized step). Both settings trained the identical step
+count over the identical manifest (<code>manifest_fingerprint</code> recorded and checked on every resume
+&mdash; see <code>index_manifest</code>/<code>load_state_dict</code> in &sect;4.1) so the DINO-vs-LeJEPA
+comparison in &sect;6 is apples-to-apples on corpus coverage, unlike the earlier subset-era LeJEPA/ImageNet
+run that overran to ~4 epochs (&sect;2, <span class="commit">f898184</span>).</p>
+
+<h3>3.2 SLURM submission history &mdash; <code>vlfz_fullstream</code> jobs</h3>
+<p>14 total job records under the <code>vlfz_fullstream</code> job name between 2026-09-17 and 2026-09-29
+(<code>sacct -u ra82sat2 --starttime 2026-09-16 -o JobID,JobName,State,Elapsed,Start,End,NodeList,ExitCode -X</code>),
+covering both settings&rsquo; pilot + full phases end to end. This is every resubmission the orchestrator
+(or a manual intervention) made, not a curated subset.</p>
+<table>
+<thead><tr><th>Job ID</th><th>State</th><th>Elapsed</th><th>Start &rarr; End</th><th>Node</th><th>Exit</th><th>What it was</th></tr></thead>
+<tbody>
+<tr><td class="kv">5795331</td><td class="lose">FAILED</td><td class="kv">00:13:41</td><td class="kv">09-17 20:08 &rarr; 20:22</td><td class="kv">a100</td><td class="kv">1:0</td><td>manifest-index-time <code>BadZipFile</code> (&sect;3.4.1)</td></tr>
+<tr><td class="kv">5795712</td><td class="win">COMPLETED</td><td class="kv">05:55:06</td><td class="kv">09-17 23:48 &rarr; 09-18 05:43</td><td class="kv">a100</td><td class="kv">0:0</td><td>pilot phase, both settings</td></tr>
+<tr><td class="kv">5796128</td><td class="win">COMPLETED</td><td class="kv">05:55:01</td><td class="kv">09-18 05:48 &rarr; 11:43</td><td class="kv">a100</td><td class="kv">0:0</td><td>pilot phase (cont.)</td></tr>
+<tr><td class="kv">5799991</td><td class="lose">FAILED</td><td class="kv">12:25:41</td><td class="kv">09-21 03:22 &rarr; 15:48</td><td class="kv">a100</td><td class="kv">1:0</td><td>full/DINO, truncated-image crash (&sect;2, 916a684)</td></tr>
+<tr><td class="kv">5799992</td><td class="lose">FAILED</td><td class="kv">06:11:27</td><td class="kv">09-21 15:48 &rarr; 22:00</td><td class="kv">a100</td><td class="kv">1:0</td><td>full/DINO resume, same failure mode recurs (fix not yet landed)</td></tr>
+<tr><td class="kv">5801249</td><td class="lose">FAILED</td><td class="kv">18:57:05</td><td class="kv">09-23 16:55 &rarr; 09-24 11:53</td><td class="kv">a100</td><td class="kv">1:0</td><td>full/DINO, portal HTTP 500 outage (&sect;2, 3b7b3a4)</td></tr>
+<tr><td class="kv">5802400</td><td class="lose">FAILED</td><td class="kv">01:44:26</td><td class="kv">09-24 10:09 &rarr; 11:53</td><td class="kv">a100</td><td class="kv">1:0</td><td>same portal outage, still ongoing</td></tr>
+<tr><td class="kv">5805344</td><td>CANCELLED</td><td class="kv">00:00:00</td><td class="kv">(queued, never ran)</td><td class="kv">&mdash;</td><td class="kv">&mdash;</td><td>superseded by a later submission before it was scheduled</td></tr>
+<tr><td class="kv">5805345</td><td>CANCELLED</td><td class="kv">00:00:00</td><td class="kv">(queued, never ran)</td><td class="kv">&mdash;</td><td class="kv">&mdash;</td><td>superseded, same as above</td></tr>
+<tr><td class="kv">5808422</td><td class="win">COMPLETED</td><td class="kv">1-23:58:10</td><td class="kv">09-24 19:21 &rarr; 09-26 19:19</td><td class="kv">a100</td><td class="kv">0:0</td><td>ran almost exactly to the 48h wall and exited cleanly right at it</td></tr>
+<tr><td class="kv">5808423</td><td class="lose">TIMEOUT</td><td class="kv">2-00:00:19</td><td class="kv">09-24 19:56 &rarr; 09-26 19:56</td><td class="kv">a100</td><td class="kv">TIMEOUT</td><td>full/LeJEPA &mdash; hard 48h kill, self-resubmit trap did <em>not</em> fire (&sect;3.4.4, unresolved)</td></tr>
+<tr><td class="kv">5812722</td><td class="win">COMPLETED</td><td class="kv">1-13:17:44</td><td class="kv">09-28 09:44 &rarr; 09-29 23:02</td><td class="kv">a100</td><td class="kv">0:0</td><td><strong>full/DINO, final run &mdash; matches CARD.json slurm_job=5812722</strong></td></tr>
+<tr><td class="kv">5813131</td><td>CANCELLED</td><td class="kv">00:00:00</td><td class="kv">(queued, never ran)</td><td class="kv">&mdash;</td><td class="kv">&mdash;</td><td>superseded</td></tr>
+<tr><td class="kv">5813141</td><td class="win">COMPLETED</td><td class="kv">01:19:54</td><td class="kv">09-27 06:09 &rarr; 07:29</td><td class="kv">h100</td><td class="kv">0:0</td><td>evaluation pass for the finished LeJEPA run</td></tr>
+</tbody>
+</table>
+
+<h3>3.3 GPU-hours actually consumed</h3>
+<p>Summing every non-cancelled job&rsquo;s <code>Elapsed</code> from the table above (failed and
+timed-out attempts included, since the GPU allocation was held and billed regardless of outcome):</p>
+<table>
+<thead><tr><th>Bucket</th><th>Elapsed sum</th><th>Hours</th></tr></thead>
+<tbody>
+<tr><td>COMPLETED jobs only (5795712, 5796128, 5808422, 5812722, 5813141)</td><td class="kv">98h 25m 55s</td><td class="kv">&asymp; 98.4</td></tr>
+<tr><td>FAILED + TIMEOUT jobs (5795331, 5799991, 5799992, 5801249, 5802400, 5808423)</td><td class="kv">87h 32m 39s</td><td class="kv">&asymp; 87.5</td></tr>
+<tr><td><strong>All 14 submissions combined</strong></td><td class="kv"><strong>185h 58m 34s</strong></td><td class="kv"><strong>&asymp; 186.0</strong></td></tr>
+</tbody>
+</table>
+<p class="small">i.e. roughly 47% of the GPU-hours actually spent on the full-corpus phase went to attempts
+that did not reach <code>DONE</code> &mdash; the outages and bugs in &sect;3.4 were not a rounding error
+against the ~98.4 productive hours, they were comparable in magnitude. All jobs ran single-GPU
+(<code>lrz-hgx-a100-80x4</code> / <code>lrz-hgx-h100-94x4</code> partitions, <code>--gres=gpu:1</code>), so
+GPU-hours and job-wall-clock-hours are the same number here. Queue wait between submissions (not counted
+above, since <code>sacct Elapsed</code> is run time only) was itself substantial &mdash; the
+<span class="commit">c26aefe</span> commit message records ~2 days of queue wait against ~550 pending jobs
+cluster-wide for one admission window, which is exactly why the wall-time ceiling was raised from 24h to 48h
+(fewer re-entries into that queue, not less total compute).</p>
+
+<h3>3.4 Chronological failure narrative</h3>
+<p>One entry per distinct failure mode actually observed in the full-corpus phase, in the order they were
+hit. Three of these (3.4.1&ndash;3.4.3 quoted tracebacks) are the same underlying bugs narrated in &sect;2,
+now tied to the specific job IDs and log evidence that surfaced them during the full-corpus runs
+specifically (as opposed to the earlier subset-era occurrences already covered above). 3.4.4 and 3.4.5 are
+full-corpus-phase-only findings not previously documented.</p>
+
+<h4>3.4.1 &mdash; Manifest-indexing BadZipFile (job 5795331, 2026-09-17)</h4>
+<p>The very first fullstream submission failed in 13 minutes &mdash; too fast to be a training crash, and
+indeed it was in <code>index_manifest()</code> (&sect;4.1), which runs once up front to build the
+frozen 506-archive manifest before any training starts. The corresponding pilot log shows the real
+exception:</p>
+<div class="codehdr">$HOME/vlf_zeiss_fullstream/pilot_dino.log (real traceback)</div>
+<pre><code>File ".../zipfile.py", line ..., in _RealGetContents
+    raise BadZipFile("File is not a zip file")
+zipfile.BadZipFile: File is not a zip file</code></pre>
+<p>i.e. a specific portal archive was, at that moment, not readable as a zip at all &mdash; a genuinely bad
+or still-being-written archive on the portal side, encountered during the manifest-build pass
+(<code>index_manifest</code>&rsquo;s fallback path: try a streamed <code>RangeReader</code> open first, and
+if that raises, fully download and retry via <code>archive_members</code> &mdash; the traceback shown means
+even the full download+retry path hit the same unreadable archive). This predates and is <em>not</em> the
+same code path as the later truncated-<em>image</em>-inside-a-good-zip bug (3.4.2); this is a whole archive
+being bad. <strong>Honest gap:</strong> I did not find a dedicated commit that hardens
+<code>index_manifest</code> itself against this &mdash; the run simply succeeded on the next attempt
+(<code>5795712</code>), consistent with a transient portal-side hiccup on one archive rather than a
+permanently broken one, but that is an inference from the retry succeeding, not a confirmed root cause.</p>
+
+<h4>3.4.2 &mdash; Truncated portal image mid-training (jobs 5799991 &rarr; 5799992, 2026-09-21)</h4>
+<p>Covered in full in &sect;2 (commit <span class="commit">916a684</span>). The traceback quoted there
+(<code>OSError: image file is truncated</code>, at step ~8583 of DINO&rsquo;s run) is from
+<code>full_dino.log</code> and falls inside this exact job window: <code>5799991</code> ran 12h25m before
+dying, <code>5799992</code> resumed from its checkpoint and ran another 6h11m before hitting the same
+unguarded failure again &mdash; the fix (catch in <code>portal.py</code>, blank the sample) had not landed
+yet at either point; it was committed later that same day (18:48) once the failure mode was understood from
+these two attempts.</p>
+
+<h4>3.4.3 &mdash; Portal HTTP 500 outage (jobs 5801249 &rarr; 5802400, 2026-09-23/24)</h4>
+<p>Covered in full in &sect;2 (commits <span class="commit">26c315e</span>,
+<span class="commit">3b7b3a4</span>). <code>5801249</code> ran nearly 19 hours before hitting the outage and
+dying; <code>5802400</code>, resubmitted, hit the still-ongoing outage again after only 1h44m (the outage
+window was ~2 hours per the commit message, so this resubmission landed squarely inside it). Both
+pre-date the retry-budget fix.</p>
+
+<h4>3.4.4 &mdash; The recurring TIMEOUT/resubmit asymmetry, still not fully explained (job 5808423, 2026-09-24/26)</h4>
+<p><code>5808423</code> (LeJEPA&rsquo;s full run) hit the hard 48-hour SLURM wall (<code>State=TIMEOUT</code>,
+<code>Elapsed=2-00:00:19</code>, i.e. it ran essentially the full 48h ceiling) and did not self-resubmit,
+requiring a manual <code>sbatch lrz/sbatch_fullstream.sbatch</code> afterwards. Its DINO counterpart,
+<code>5808422</code>, finished the same wall-time window as a clean <code>COMPLETED</code> exit
+(<code>1-23:58:10</code>, i.e. it happened to land just under the wall and exit via the normal
+<code>DONE</code> path rather than being timed out at all) &mdash; so this particular pair does not actually
+demonstrate the trap failing under equal conditions; DINO simply didn&rsquo;t need the trap that time.
+The trap mechanism itself (<code>lrz/sbatch_fullstream.sbatch</code>&rsquo;s
+<code>trap '...kill -USR1 "$child"...' USR1</code> plus <code>#SBATCH --signal=B:USR1@300</code>, giving 5
+minutes&rsquo; notice) is the same one described fixed in &sect;2 (<span class="commit">c0be0e6</span>) for
+the earlier subset-era jobs, and reads correctly on inspection (&sect;4.5). Whether
+<code>5808423</code>&rsquo;s non-resubmit was a genuine recurrence of the TIMEOUT/clean-exit asymmetry,
+a SIGUSR1-forwarding race specific to that job, or something else entirely was <strong>not root-caused
+</strong> &mdash; I am flagging it honestly as an open question rather than asserting a cause I cannot
+back with log evidence. Operationally, training resumed the same day via manual resubmission and LeJEPA
+reached <code>DONE</code> normally afterward (evaluation completed 2026-09-27, per
+<code>evaluation_lejepa.json</code>).</p>
+
+<h4>3.4.5 &mdash; W&amp;B stale run-ID collision at job start</h4>
+<p>Independently of the SLURM-level failures above, <code>full_lejepa.log</code> shows two consecutive
+immediate crashes right at <code>wandb.init()</code>, before any training step:</p>
+<div class="codehdr">$HOME/vlf_zeiss_fullstream/full_lejepa.log (real traceback)</div>
+<pre><code>File ".../wandb/sdk/mailbox/response_handle.py", line 131, in _response_or_error
+    raise ServerResponseError(self._response.error_response.message)
+wandb.sdk.mailbox.mailbox_handle.ServerResponseError: run ID 2982342daf1221a3 is in use</code></pre>
+<p><code>_wandb_logger</code> (&sect;4.3) derives the W&amp;B run id deterministically as
+<code>md5(out_dir + namespace)[:16]</code> specifically so a SLURM resubmit resumes the <em>same</em> W&amp;B
+run rather than fragmenting history across a dozen job IDs. The failure mode this trades in for: if a
+previous process holding that run id was killed uncleanly (e.g. by the same TIMEOUT/SIGKILL path discussed
+in 3.4.4) rather than releasing it, the W&amp;B backend can consider that run id still "in use" and refuse a
+fresh <code>wandb.init(resume="allow")</code> against it. <code>lrz/fullstream_env.sh</code> carries the
+operational escape hatch for exactly this, in its own words: <code>WANDB_RUN_NAMESPACE</code>
+(default <code>fullstream_optimized_v2</code>) is folded into the run-id hash precisely to "avoid W&amp;B
+stale-run collisions while remaining stable across resubmissions" &mdash; bumping the namespace mints a
+fresh run id and unsticks a wedged one. This is a real, observed failure mode with no dedicated bug-fix
+commit; the mitigation is a config knob that already existed for this purpose, not new code written in
+response to it.</p>
+<hr class="sep">
+<h2 id="codewalk">4. Code walkthrough</h2>
+<p>Real code, read from disk, in logical chunks. One subsection per key file. This is not every line
+&mdash; it&rsquo;s every chunk whose shape is the product of a specific decision or bug fix, with enough
+surrounding context to place it.</p>
+
+<h3 id="portal">4.1 <code>vlfz/data/portal.py</code> &mdash; the portal stream</h3>
+<p>This is the file the whole full-corpus pivot hinges on: a resumable, checkpoint-safe
+<code>IterableDataset</code> that streams the 506 raw portal zip archives directly, with only a two-archive
+disk budget resident at any time, and never advances its durable progress cursor except after a successful
+optimizer step.</p>
+<div class="codehdr">vlfz/data/portal.py:1-25</div><pre><code>&quot;&quot;&quot;Finite, resumable Cortex ZIP stream with a two-archive disk budget.
+
+Only the training consumer commits progress. Downloads and decoding never
+advance the durable cursor. No authentication material enters the manifest.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import hashlib
+import io
+import json
+import os
+import random
+import shutil
+import subprocess
+import tempfile
+import time
+import zipfile
+from contextlib import contextmanager, nullcontext
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from pathlib import Path
+
+import requests
+from torch.utils.data import IterableDataset
+
+EXTENSIONS = (&#x27;.png&#x27;, &#x27;.jpg&#x27;, &#x27;.jpeg&#x27;, &#x27;.webp&#x27;, &#x27;.bmp&#x27;)</code></pre>
+<p>The module docstring states the two invariants everything else in the file protects: only the
+<em>training consumer</em> commits progress (downloads/decodes are speculative and can be retried freely
+without corrupting resume state), and no auth material ever enters the manifest file that gets checkpointed
+and read back later.</p>
+<div class="codehdr">vlfz/data/portal.py:35-56</div><pre><code>def _transform_sample(raw, identity, transform):
+    import torch
+    import numpy as np
+    # PortalStream.decode already turns a truncated/corrupt image, or a
+    # missing archive member (raw=None), into a deterministic blank -- it
+    # never raises, so there&#x27;s nothing to catch here.
+    seed = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:4], &#x27;big&#x27;)
+    py_state, np_state = random.getstate(), np.random.get_state()
+    with torch.random.fork_rng(devices=[]):
+        torch.random.default_generator.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        try:
+            return transform(PortalStream.decode(raw))
+        finally:
+            random.setstate(py_state)
+            np.random.set_state(np_state)
+
+
+def _worker_sample(task):
+    return _transform_sample(*task, _worker_transform)</code></pre>
+<p><code>_transform_sample</code> is what actually runs per image, in a worker process when
+<code>transform_workers &gt; 0</code>. Two things worth noting: the per-sample seed is derived from a SHA-256
+hash of a stable <code>identity</code> string (<code>f'{seed}:{epoch}:{item["id"]}:{n}'</code>) rather than
+anything positional, so re-decoding the same logical sample on a resume produces the identical augmentation
+regardless of which worker or in what order it runs. And the comment records that
+<code>PortalStream.decode</code> (below) already turns every failure mode into a deterministic blank &mdash;
+by this point in the file&rsquo;s history there is deliberately nothing left to catch here (see the
+corrupt-image war story, &sect;2).</p>
+<div class="codehdr">vlfz/data/portal.py:99-144</div><pre><code>    def url(self, item):
+        # 401/403 -&gt; renew the session once, then retry. 5xx or a network
+        # exception -&gt; the portal is transiently unreachable, not wrong (a
+        # real ~2h HTTP 500 window killed both training jobs on 2026-09-24;
+        # download() already retried transient failures, this call never
+        # did, and an earlier version of this fix only budgeted ~31s total,
+        # which would NOT have survived that outage). Retrying costs nothing
+        # -- the GPU allocation is already held either way -- while dying
+        # costs however long it takes a human to notice plus re-entering a
+        # queue that has taken up to 2 days under real contention, so budget
+        # for hours, not seconds. Any OTHER status (404, 400, ...) is still
+        # fatal immediately: that&#x27;s a real, permanent problem, not a
+        # transient one, and retrying it forever would just hide it.
+        renewed = False
+        deadline = time.monotonic() + 3 * 3600  # 3h -- comfortably past the observed 2h outage
+        attempt = 0
+        while True:
+            try:
+                r = self.session.post(f&quot;{self.base}/api/provided_file/{item[&#x27;id&#x27;]}/download_url/&quot;,
+                                      data=&#x27;{}&#x27;, timeout=60)
+            except requests.RequestException as e:
+                r = None
+                transient = e
+            else:
+                transient = None
+                if r.status_code == 200:
+                    return r.json()[&#x27;url&#x27;]
+                if r.status_code in (401, 403) and not renewed:
+                    renewed = True
+                    try:
+                        self.renew()
+                    except requests.RequestException:
+                        raise RuntimeError(&#x27;Portal renewal failed; refresh private credentials&#x27;) from None
+                    continue
+                if r.status_code &lt; 500:
+                    raise RuntimeError(f&#x27;Portal authorization/request failed: HTTP {r.status_code}&#x27;)
+            # Transient (network exception, or a 5xx from the portal itself).
+            if time.monotonic() &gt;= deadline:
+                detail = f&#x27;HTTP {r.status_code}&#x27; if r is not None else repr(transient)
+                raise RuntimeError(f&#x27;Portal still unreachable after 3h of retrying ({detail})&#x27;)
+            wait = min(2 ** attempt, 300)  # ramps to a 5-minute cap, not 30s
+            print(f&#x27;[portal] url() attempt {attempt+1} failed &#x27;
+                  f&#x27;({&quot;HTTP &quot; + str(r.status_code) if r is not None else repr(transient)}) -- &#x27;
+                  f&#x27;retrying in {wait}s&#x27;, flush=True)
+            time.sleep(wait)
+            attempt += 1</code></pre>
+<p><code>PortalClient.url()</code> is the single most heavily-revised function in the file &mdash; see
+&sect;2 for the full history. As it stands: a 401/403 triggers exactly one session renewal (re-login through
+<code>CORTEX_ACCESS_URL</code>) before retrying; a 5xx or a raw network exception is treated as transient
+and retried with exponential backoff (capped at 5 minutes per attempt) against a <strong>3-hour</strong>
+overall deadline; anything else (404, 400, ...) is immediately fatal, on the theory that retrying a genuinely
+permanent error forever just hides it from a human who should be looking at it. The economic argument for
+the 3-hour figure is spelled out directly in the comment: the GPU allocation is already paid for and held
+either way, so the true cost of giving up early isn&rsquo;t the retry time, it&rsquo;s a human having to
+notice the death and then re-enter a SLURM queue that has taken up to two days under real contention.</p>
+<div class="codehdr">vlfz/data/portal.py:162-194</div><pre><code>    def download(self, item, path):
+        expected = item[&#x27;size&#x27;]
+        for attempt in range(6):
+            have = path.stat().st_size if path.exists() else 0
+            if have == expected:
+                return path
+            if have &gt; expected:
+                raise RuntimeError(&#x27;Oversized cached ZIP; inspect cache&#x27;)
+            try:
+                with requests.get(self.url(item), headers={&#x27;Range&#x27;: f&#x27;bytes={have}-&#x27;},
+                                  stream=True, timeout=(30, 120)) as r:
+                    if r.status_code not in (200, 206):
+                        raise OSError(&#x27;Download rejected&#x27;)
+                    if r.status_code == 206 and r.headers.get(&#x27;Content-Range&#x27;) != f&#x27;bytes {have}-{expected-1}/{expected}&#x27;:
+                        raise OSError(&#x27;Invalid Content-Range&#x27;)
+                    mode = &#x27;ab&#x27; if r.status_code == 206 else &#x27;wb&#x27;
+                    count = have if mode == &#x27;ab&#x27; else 0
+                    with path.open(mode) as f:
+                        for block in r.iter_content(1 &lt;&lt; 20):
+                            if count + len(block) &gt; expected:
+                                raise RuntimeError(&#x27;Server exceeded declared ZIP size&#x27;)
+                            f.write(block)
+                            count += len(block)
+                            self.transferred_bytes += len(block)
+                if count == expected:
+                    return path
+            except requests.RequestException:
+                pass  # Never print requests exceptions: they contain signed URLs.
+            except OSError as e:
+                if e.errno in (28, 122):
+                    raise RuntimeError(&#x27;Storage full or quota exceeded&#x27;) from None
+            time.sleep(min(2 ** attempt, 30))
+        raise RuntimeError(f&quot;Download exhausted retries: {item[&#x27;file_name&#x27;]}&quot;)</code></pre>
+<p><code>PortalClient.download()</code> resumes a partial download via HTTP <code>Range</code> requests
+keyed on bytes already on disk (<code>have</code>), which matters because a single portal archive can be
+close to a gigabyte and the two-archive cache is meant to be resilient to a mid-download crash without
+re-fetching from byte zero. Two defensive details: it refuses to write past the archive&rsquo;s declared
+size (<code>Server exceeded declared ZIP size</code>) rather than trusting the server unconditionally, and it
+deliberately never prints the caught <code>requests.RequestException</code> &mdash; that exception object can
+contain the request URL, which for this client is a <em>signed, time-limited download URL</em>; logging it
+would leak a working credential into the SLURM log files.</p>
+<div class="codehdr">vlfz/data/portal.py:351-377</div><pre><code>def index_manifest(client, cache, path, expected=506):
+    items = sorted([{k: f[k] for k in (&#x27;id&#x27;, &#x27;file_name&#x27;, &#x27;size&#x27;)} for f in client.spec[&#x27;files&#x27;]],
+                   key=lambda f: f[&#x27;file_name&#x27;])
+    if len(items) != expected or len({f[&#x27;id&#x27;] for f in items}) != expected:
+        raise RuntimeError(f&#x27;Expected {expected} distinct portal archives&#x27;)
+    digest = hashlib.sha256(json.dumps(items, sort_keys=True).encode()).hexdigest()
+    path = Path(path)
+    result = json.loads(path.read_text()) if path.exists() else {&#x27;fingerprint&#x27;: digest, &#x27;archives&#x27;: []}
+    if result[&#x27;fingerprint&#x27;] != digest:
+        raise RuntimeError(&#x27;Portal manifest changed; use a new run&#x27;)
+    for item in items[len(result[&#x27;archives&#x27;]):]:
+        if _archive_kind(item) == &#x27;zip&#x27;:
+            try:
+                with zipfile.ZipFile(RangeReader(client, item)) as z:
+                    names = members(z)
+            except (OSError, zipfile.BadZipFile):
+                local = client.download(item, cache.reserve([item])[0])
+                names = archive_members(local, item)
+        else:
+            local = client.download(item, cache.reserve([item])[0])
+            names = archive_members(local, item)
+        if not names or len(names) != len(set(names)):
+            raise RuntimeError(&#x27;Empty or ambiguous archive image index&#x27;)
+        result[&#x27;archives&#x27;].append({**item, &#x27;members&#x27;: names})
+        atomic_json(path, result)
+        print(f&quot;[portal index] {len(result[&#x27;archives&#x27;])}/{expected}&quot;, flush=True)
+    return result</code></pre>
+<p><code>index_manifest</code> builds the frozen 506-archive manifest once, up front, before any training
+starts &mdash; it is what makes the corpus a fixed, checkpoint-comparable quantity rather than whatever the
+portal happens to return on a given call. A SHA-256 digest of the sorted archive list becomes the
+<code>fingerprint</code> that every checkpoint carries forward (checked in <code>load_state_dict</code>
+below): if the portal-side archive list ever changed mid-run, a resume would refuse to proceed against a
+manifest it can no longer trust, rather than silently training against a different corpus than epoch 1 saw.
+Indexing itself prefers a streamed <code>RangeReader</code> open (no full download needed just to list a
+zip&rsquo;s central directory) and falls back to a full download only if that fails &mdash; this is the code
+path that failed outright on 2026-09-17 (&sect;3.4.1).</p>
+<div class="codehdr">vlfz/data/portal.py:392-421</div><pre><code>class PortalStream(IterableDataset):
+    &quot;&quot;&quot;Iterable batch source. Call commit only after a successful optimizer step.
+
+    A corrupt/truncated image, or an archive member the manifest lists but
+    the archive no longer has, is replaced with a deterministic blank sample
+    rather than dropped or raised -- see PortalStream.decode. That keeps
+    self.sizes/cursor exact regardless of corruption, so checkpoint resume
+    never has to reconcile a shifted batch boundary. attempts/failures are
+    informational telemetry only (surfaced via coverage()), not a gate --
+    persisted across resumes via state_dict/load_state_dict so counts stay
+    accurate for the whole run, not just one epoch or one allocation.
+    &quot;&quot;&quot;
+    def __init__(self, client, cache, manifest, transform, collate, batch_size=128, seed=0, epochs=3,
+                 transform_workers=0):
+        self.client, self.cache, self.manifest = client, cache, manifest
+        self.transform, self.collate = transform, collate
+        self.seed, self.epochs = seed, epochs
+        self.transform_workers = transform_workers
+        self.sizes = batch_sizes(sum(len(a[&#x27;members&#x27;]) for a in manifest[&#x27;archives&#x27;]), batch_size)
+        self.cursor = {&#x27;epoch&#x27;: 0, &#x27;batch&#x27;: 0}
+        # Live counts advance as samples are produced; _committed is the
+        # snapshot state_dict()/checkpointing sees -- frozen between commits,
+        # exactly like self.cursor, so a crash between producing and
+        # committing a batch doesn&#x27;t change what a resume sees.
+        self.attempts = 0
+        self.failures = 0
+        self._committed = {&#x27;attempts&#x27;: 0, &#x27;failures&#x27;: 0}
+
+    def state_dict(self):
+        return {**self.cursor, &#x27;fingerprint&#x27;: self.manifest[&#x27;fingerprint&#x27;], **self._committed}</code></pre>
+<p><code>PortalStream</code>&rsquo;s own docstring (kept in full here, since it&rsquo;s the clearest single
+statement of the resume-correctness invariant in the file) explains why a corrupt image is blanked rather
+than dropped: dropping would change <code>self.sizes</code> (the per-batch counts, computed once from the
+manifest) and shift every later batch boundary, which would make an exact checkpoint resume impossible to
+reason about. <code>attempts</code>/<code>failures</code> are tracked as two separate counters &mdash; a
+live one that advances immediately as samples are produced, and a <code>_committed</code> snapshot that only
+moves inside <code>commit()</code> &mdash; for the same reason <code>self.cursor</code> itself is snapshotted
+that way: a crash between producing a batch and committing it must not be able to corrupt what the next
+resume trusts.</p>
+<div class="codehdr">vlfz/data/portal.py:448-467</div><pre><code>    @staticmethod
+    def decode(raw):
+        from PIL import Image, ImageFile
+
+        # The raw portal tier includes a small number of truncated PNGs, and
+        # (rarer) an archive member the manifest lists but the archive no
+        # longer has (raw=None from __iter__, e.g. a genuine KeyError on
+        # extraction). Keep the stream cardinality/cursor stable either way:
+        # PIL can recover most truncated files, and both that&#x27;s-still-
+        # unreadable case and the missing-member case become a deterministic
+        # blank sample. Dropping either would shift every later batch and
+        # invalidate exact checkpoint resume semantics.
+        if raw is None:
+            return Image.new(&#x27;RGB&#x27;, (224, 224))
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        try:
+            with Image.open(io.BytesIO(raw)) as im:
+                return im.convert(&#x27;RGB&#x27;)
+        except (OSError, ValueError):
+            return Image.new(&#x27;RGB&#x27;, (224, 224))</code></pre>
+<p><code>decode()</code>, final form. <code>raw is None</code> covers a manifest-listed archive member that
+turned out to be missing at read time (a genuine <code>KeyError</code> during extraction, caught in
+<code>__iter__</code> below) &mdash; that and an unrecoverable truncated image both collapse to the same
+<code>Image.new('RGB', (224, 224))</code> blank. <code>ImageFile.LOAD_TRUNCATED_IMAGES = True</code> is set
+immediately before the decode attempt so PIL first <em>tries</em> to recover as much of a truncated file as
+it can (most truncated PNGs in the raw portal tier are, in practice, still mostly decodable) before falling
+back to a blank only for the genuinely unreadable remainder.</p>
+<div class="codehdr">vlfz/data/portal.py:469-526</div><pre><code>    def __iter__(self):
+        epoch, batch_start = self.cursor[&#x27;epoch&#x27;], self.cursor[&#x27;batch&#x27;]
+        if epoch &gt;= self.epochs:
+            return
+        order = list(self.manifest[&#x27;archives&#x27;])
+        random.Random(self.seed + epoch).shuffle(order)
+        skip = sum(self.sizes[:batch_start])
+        batch, bi = [], batch_start
+        wait_started = time.monotonic()
+        import multiprocessing
+        pool_context = (ProcessPoolExecutor(
+            max_workers=self.transform_workers, mp_context=multiprocessing.get_context(&#x27;spawn&#x27;),
+            initializer=_init_transform_worker, initargs=(self.transform,))
+            if self.transform_workers else nullcontext(None))
+        with ThreadPoolExecutor(max_workers=1) as downloads, pool_context as transforms:
+            future = None
+            for ai, item in enumerate(order):
+                names = list(item[&#x27;members&#x27;])
+                random.Random(f&#x27;{self.seed}:{epoch}:{item[&quot;id&quot;]}&#x27;).shuffle(names)
+                if skip &gt;= len(names):
+                    skip -= len(names)
+                    continue
+                pair = order[ai:ai+2]
+                paths = self.cache.reserve(pair)
+                path = future.result() if future else self.client.download(item, paths[0])
+                future = downloads.submit(self.client.download, pair[1], paths[1]) if len(pair) == 2 else None
+                names = names[skip:]
+                skip = 0
+                with archive_reader(path, {**item, &#x27;_reserved_bytes&#x27;: sum(x[&#x27;size&#x27;] for x in pair)}) as read_member:
+                    chunk = max(4, self.transform_workers * 4)
+                    for start in range(0, len(names), chunk):
+                        # Bounded tasks; ordered map preserves exact sample order.
+                        tasks = []
+                        for n in names[start:start+chunk]:
+                            identity = f&#x27;{self.seed}:{epoch}:{item[&quot;id&quot;]}:{n}&#x27;
+                            self.attempts += 1
+                            try:
+                                tasks.append((read_member(n), identity))
+                            except (OSError, zipfile.BadZipFile, EOFError, KeyError) as e:
+                                self.record_failure(identity, e)
+                                tasks.append((None, identity))  # decode() blanks a None raw
+                        samples = (transforms.map(_worker_sample, tasks) if transforms else
+                                   (_transform_sample(*task, self.transform) for task in tasks))
+                        for sample in samples:
+                            batch.append(sample)
+                            if len(batch) == self.sizes[bi]:
+                                bi += 1
+                                cursor = {&#x27;epoch&#x27;: epoch + 1, &#x27;batch&#x27;: 0} if bi == len(self.sizes) else {&#x27;epoch&#x27;: epoch, &#x27;batch&#x27;: bi}
+                                views = self.collate(batch)
+                                yield {&#x27;views&#x27;: views, &#x27;cursor&#x27;: cursor,
+                                       &#x27;data_wait_seconds&#x27;: time.monotonic() - wait_started,
+                                       &#x27;transferred_bytes&#x27;: self.client.transferred_bytes,
+                                       &#x27;cache_reserved_peak&#x27;: self.cache.peak}
+                                wait_started = time.monotonic()
+                                batch = []
+                print(f&#x27;[portal] epoch={epoch+1} archive={ai+1}/{len(order)}&#x27;, flush=True)
+                path.unlink()</code></pre>
+<p><code>__iter__</code> is the actual streaming loop. A few things worth pointing out that are easy to
+miss on a first read:</p>
+<ul>
+<li><strong>Two-archive lookahead.</strong> <code>pair = order[ai:ai+2]</code> reserves cache space for the
+<em>current</em> archive and prefetches the <em>next</em> one on a background thread
+(<code>downloads.submit(...)</code>) while the current one is being processed &mdash; the single-threaded
+prefetch stays ahead of decode as long as archive processing (measured ~60s) is slower than the download
+(measured ~38s at the tuned worker count; see the throughput comment in &sect;5.2).</li>
+<li><strong>Resume skip logic.</strong> <code>skip = sum(self.sizes[:batch_start])</code> converts a
+checkpointed <code>(epoch, batch)</code> cursor back into "how many images into this shuffled archive order
+do I need to fast-forward" &mdash; deterministic because archive order and per-archive member order are both
+reproduced from the same seeded <code>random.Random</code> calls used originally.</li>
+<li><strong>Cache eviction.</strong> <code>path.unlink()</code> at the very end of each archive&rsquo;s loop
+body deletes the local copy immediately after it&rsquo;s fully consumed &mdash; the two-archive budget is
+enforced by never holding more than the current + one prefetched archive on disk at once.</li>
+<li><strong>Process-pool transforms.</strong> When <code>transform_workers &gt; 0</code>, augmentation runs
+in a <code>ProcessPoolExecutor</code> (not threads &mdash; PIL/augmentation work is CPU-bound and would
+serialize under the GIL) seeded via <code>_init_transform_worker</code>, with the parent process retaining
+sole ownership of the stream/cursor state.</li>
+</ul>
+<hr class="sep">
+
+<h3 id="fullstream-code">4.2 <code>vlfz/ssl/fullstream.py</code> &mdash; the orchestrator</h3>
+<p>136 lines. This is the entrypoint launched once per SLURM allocation, and its whole job is to make every
+phase idempotent across an arbitrary number of resubmissions. Points worth flagging:</p>
+<ul>
+<li><code>preflight(root)</code> runs before anything else: it waits up to 90s for CUDA to become visible
+(a fresh allocation can briefly report no GPU while NVML initializes &mdash; not worth discarding a 48h
+allocation over), refuses to run if <code>OUT_ROOT</code> is a symlink or not a direct child of
+<code>$HOME</code> (a direct, permanent guard against ever repeating the historical
+<code>vlf_zeiss_runs</code>-symlink-onto-scratch confusion from &sect;2/WS4), and does a real
+<code>mmlsquota</code> check plus an actual 1&nbsp;MB write-and-fsync probe before training starts &mdash;
+checking the quota <em>banner</em> was already established as untrustworthy earlier in the project
+(<code>docs/PLAN.md</code>&rsquo;s 2026-09-14 notes record the LRZ quota dashboard not moving after real
+deletions), so this checks the filesystem directly.</li>
+<li>Per-phase idempotency is a plain file-existence check: <code>receipt = root / f'{phase}_{objective}.json'</code>;
+if it exists, that phase is done, skip straight to whatever comes next. This is what makes the whole
+14-submission history in &sect;3.2 safe to have happened &mdash; every resubmission re-enters at exactly the
+first unfinished receipt, never repeats already-<code>DONE</code> work.</li>
+<li>The pilot phase (<code>--limit-steps 200</code>) exists specifically to catch a CUDA OOM cheaply before
+committing to the full multi-day run: if the pilot OOMs, it is retried exactly once with
+<code>GRAD_CKPT=true</code>, and whatever that pilot decided is threaded into the full run&rsquo;s
+environment (<code>env['GRAD_CKPT'] = ...</code>) so the full run doesn&rsquo;t have to rediscover the same
+trade-off.</li>
+<li><code>evaluate()</code> takes a cross-objective file lock (<code>.evaluation.lock</code>) because
+evaluation shares feature caches and report files across both DINO and LeJEPA &mdash; without the lock, two
+concurrently-finishing settings could race on the same cache file.</li>
+<li>The final block publishes each finished setting&rsquo;s <code>ema_backbone.pt</code> as a W&amp;B
+Artifact (<code>dino-imagenet-s506-raw-e3</code>, <code>lejepa-imagenet-s506-raw-e3</code>) &mdash; this is
+what makes the checkpoint durable independent of LRZ storage (&sect;6).</li>
+</ul>
+<div class="codehdr">vlfz/ssl/fullstream.py</div><pre><code>&quot;&quot;&quot;Sequential pilots, full runs, evaluation and artifact publication.
+
+Receipts make restarts idempotent. Only a checkpointed wall-time exit (75)
+requests resubmission; all other failures require inspection.
+&quot;&quot;&quot;
+import json
+import fcntl
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+
+from ..data.portal import atomic_json
+
+
+def preflight(root):
+    import re
+    import torch
+    # A fresh Slurm GPU allocation can briefly report CUDA unavailable while
+    # NVML initializes. Do not discard an otherwise valid 24-hour allocation
+    # for that transient condition.
+    for attempt in range(1, 7):
+        if torch.cuda.is_available():
+            break
+        if attempt == 6:
+            raise RuntimeError(&#x27;GPU unavailable after readiness retries&#x27;)
+        print(f&#x27;[fullstream] GPU not ready (attempt {attempt}/6); retrying in 15s&#x27;, flush=True)
+        time.sleep(15)
+    if root.is_symlink() or root.resolve().parent != Path.home().resolve():
+        raise RuntimeError(&#x27;Fullstream root must be a real directory under home&#x27;)
+    q = subprocess.run([&#x27;/usr/lpp/mmfs/bin/mmlsquota&#x27;, &#x27;-u&#x27;, os.environ[&#x27;USER&#x27;], &#x27;dsshome1&#x27;],
+                       capture_output=True, text=True, timeout=60, check=True)
+    line = next((s for s in q.stdout.splitlines() if re.match(r&#x27;dsshome1\s+USR\s&#x27;, s)), None)
+    if not line:
+        raise RuntimeError(&#x27;Cannot validate home quota&#x27;)
+    fields = line.split()
+    used, soft = int(fields[2]), int(fields[3])
+    cache = Path(os.environ[&#x27;PORTAL_CACHE&#x27;])
+    cached = sum(p.stat().st_size for p in cache.glob(&#x27;*.zip&#x27;))
+    needed = max(0, 16*2**30 - cached) + 8*2**30
+    if (soft-used)*1024 &lt; needed:
+        raise RuntimeError(&#x27;Insufficient quota for cache growth and atomic checkpoints&#x27;)
+    root.mkdir(exist_ok=True)
+    probe = root / &#x27;.checkpoint-write-test&#x27;
+    with probe.open(&#x27;wb&#x27;) as f:
+        f.write(bytes(1024*1024))
+        f.flush()
+        os.fsync(f.fileno())
+    probe.unlink()
+
+
+def main():
+    root = Path(os.environ[&#x27;OUT_ROOT&#x27;]).expanduser()
+    preflight(root)
+    objectives = os.environ.get(&#x27;STREAM_OBJECTIVES&#x27;, &#x27;dino,lejepa&#x27;).split(&#x27;,&#x27;)
+    if not objectives or any(x not in (&#x27;dino&#x27;, &#x27;lejepa&#x27;) for x in objectives):
+        raise ValueError(&#x27;STREAM_OBJECTIVES must contain dino and/or lejepa&#x27;)
+    locks = []
+    for objective in sorted(set(objectives)):
+        lock = (root / f&#x27;.{objective}.lock&#x27;).open(&#x27;a&#x27;)
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        locks.append(lock)
+    child = None
+
+    def forward(*_):
+        if child is not None:
+            child.send_signal(signal.SIGUSR1)
+
+    signal.signal(signal.SIGUSR1, forward)
+
+    def evaluate(objective):
+        # Evaluation shares feature caches and report files across objectives.
+        with (root / &#x27;.evaluation.lock&#x27;).open(&#x27;a&#x27;) as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            evaluate_locked(objective)
+
+    def evaluate_locked(objective):
+        receipt = root / f&#x27;evaluation_{objective}.json&#x27;
+        if receipt.exists():
+            return
+        for stage in (&#x27;pre&#x27;, &#x27;post&#x27;):
+            args = [&#x27;--init&#x27;, &#x27;imagenet&#x27;, &#x27;--objective&#x27;, objective, &#x27;--stage&#x27;, stage,
+                    &#x27;--run-tag&#x27;, &#x27;s506_raw_e3&#x27; if stage == &#x27;post&#x27; else &#x27;&#x27;]
+            subprocess.run([sys.executable, &#x27;-m&#x27;, &#x27;vlfz.eval.run_eval&#x27;, *args], check=True)
+            subprocess.run([sys.executable, &#x27;-m&#x27;, &#x27;vlfz.eval.seg&#x27;, *args], check=True)
+        atomic_json(receipt, {&#x27;complete&#x27;: True})
+        subprocess.run([sys.executable, &#x27;-m&#x27;, &#x27;vlfz.report.aggregate&#x27;], check=True)
+
+    for phase in (&#x27;pilot&#x27;, &#x27;full&#x27;):
+        for objective in objectives:
+            receipt = root / f&#x27;{phase}_{objective}.json&#x27;
+            if receipt.exists():
+                if phase == &#x27;full&#x27;:
+                    evaluate(objective)
+                continue
+            tag = &#x27;s506_raw_e3&#x27; + (&#x27;_pilot&#x27; if phase == &#x27;pilot&#x27; else &#x27;&#x27;)
+            env = dict(os.environ, OBJ=objective, RUN_TAG=tag)
+            pilot = root / f&#x27;pilot_{objective}.json&#x27;
+            if phase == &#x27;full&#x27;:
+                env[&#x27;GRAD_CKPT&#x27;] = str(json.loads(pilot.read_text())[&#x27;grad_checkpointing&#x27;]).lower()
+            args = [sys.executable, &#x27;-m&#x27;, &#x27;vlfz.ssl.pretrain&#x27;, &#x27;--source&#x27;, &#x27;portal_zip&#x27;,
+                    &#x27;--init&#x27;, &#x27;imagenet&#x27;, &#x27;--objective&#x27;, objective, &#x27;--stage&#x27;, &#x27;full&#x27;, &#x27;--run-tag&#x27;, tag]
+            if phase == &#x27;pilot&#x27;:
+                args += [&#x27;--limit-steps&#x27;, &#x27;200&#x27;]
+            started = time.time()
+            log = root / f&#x27;{phase}_{objective}.log&#x27;
+            with log.open(&#x27;a&#x27;) as f:
+                child = subprocess.Popen(args, env=env, stdout=f, stderr=subprocess.STDOUT)
+                rc = child.wait()
+            child = None
+            if rc and rc != 75 and phase == &#x27;pilot&#x27; and &#x27;CUDA out of memory&#x27; in log.read_text():
+                env[&#x27;GRAD_CKPT&#x27;] = &#x27;true&#x27;
+                with log.open(&#x27;a&#x27;) as f:
+                    child = subprocess.Popen(args, env=env, stdout=f, stderr=subprocess.STDOUT)
+                    rc = child.wait()
+                child = None
+            if rc:
+                # A failed pilot never becomes a full run automatically.
+                raise SystemExit(rc)
+            atomic_json(receipt, {&#x27;seconds&#x27;: time.time()-started, &#x27;run_tag&#x27;: tag,
+                                  &#x27;throughput&#x27;: json.loads((root / &#x27;ssl&#x27; / f&#x27;{objective}_imagenet_gastronet_full__{tag}&#x27; / &#x27;throughput.json&#x27;).read_text()),
+                                  &#x27;grad_checkpointing&#x27;: env.get(&#x27;GRAD_CKPT&#x27;, &#x27;false&#x27;) == &#x27;true&#x27;})
+            if phase == &#x27;full&#x27;:
+                evaluate(objective)
+    import wandb
+    with wandb.init(project=os.environ.get(&#x27;WANDB_PROJECT&#x27;, &#x27;vlf-zeiss&#x27;), job_type=&#x27;publish&#x27;) as run:
+        for objective in objectives:
+            artifact = wandb.Artifact(f&#x27;{objective}-imagenet-s506-raw-e3&#x27;, type=&#x27;model&#x27;)
+            artifact.add_file(str(root / &#x27;ssl&#x27; / f&#x27;{objective}_imagenet_gastronet_full__s506_raw_e3&#x27; / &#x27;ema_backbone.pt&#x27;))
+            run.log_artifact(artifact).wait()
+
+
+if __name__ == &#x27;__main__&#x27;:
+    main()</code></pre>
+<h3 id="pretrain-code">4.3 <code>vlfz/ssl/pretrain.py</code> &mdash; the Lightning training module</h3>
+<p><code>SSLModule</code> is a <code>LightningModule</code> with <strong>manual optimization</strong>
+(<code>self.automatic_optimization = False</code>) &mdash; the dual LeJEPA/DINO objective, layer-wise LR
+decay, and EMA teacher/backbone bookkeeping don&rsquo;t fit Lightning&rsquo;s default single-optimizer loop,
+so the module owns the optimizer step explicitly while still getting checkpoint/resume, logging, and the
+callback system for free.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:40-64</div><pre><code>class AtomicCheckpointIO(TorchCheckpointIO):
+    def save_checkpoint(self, checkpoint, path, storage_options=None):
+        tmp = str(path) + &#x27;.tmp&#x27;
+        super().save_checkpoint(checkpoint, tmp, storage_options)
+        os.replace(tmp, path)
+
+
+class PortalWalltime(pl.Callback):
+    def on_fit_start(self, trainer, pl_module):
+        import signal
+        self.requested = False
+        self.previous = signal.signal(signal.SIGUSR1, self.request)
+
+    def request(self, *_):
+        self.requested = True
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if self.requested:
+            trainer.save_checkpoint(os.path.join(pl_module.out_dir, &#x27;last.ckpt&#x27;))
+            raise SystemExit(75)
+
+    def on_fit_end(self, trainer, pl_module):
+        import signal
+        signal.signal(signal.SIGUSR1, self.previous)</code></pre>
+<p><code>AtomicCheckpointIO</code> writes to a <code>.tmp</code> path and <code>os.replace()</code>s it into
+place &mdash; standard atomic-write pattern, chosen specifically because a checkpoint write that dies
+mid-write (the exact <code>OSError 28</code> home-quota crash from &sect;2/WS4) must never leave a
+half-written, unreadable <code>last.ckpt</code> behind for the next resume to trip over.
+<code>PortalWalltime</code> is the callback that turns a forwarded <code>SIGUSR1</code> (relayed from the
+sbatch wrapper&rsquo;s trap, &sect;4.5) into a synchronous checkpoint save followed by
+<code>SystemExit(75)</code> &mdash; exit code 75 is the specific signal the orchestrator and sbatch script
+both check for to mean "clean, checkpointed wall-time exit, please resubmit" as opposed to any other
+non-zero exit, which means something actually went wrong and needs a human.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:107-132</div><pre><code>    from ..data.gastronet import resolve_source, webdataset_loader, webdataset_shards
+
+    source = resolve_source(cfg, args.source)
+    if source == &#x27;portal_zip&#x27;:
+        from ..data.portal import PortalClient, ZipCache, PortalStream, index_manifest
+        client = PortalClient(str(cfg.ssl.portal_json))
+        cache = ZipCache(str(cfg.ssl.portal_cache))
+        manifest_path = os.path.join(os.path.expanduser(str(cfg.paths.out_root)), &#x27;portal_manifest.json&#x27;)
+        manifest = index_manifest(client, cache, manifest_path)
+        stream = PortalStream(client, cache, manifest, transform, collate, bs,
+                              int(cfg.seed), int(cfg.ssl.full.epochs),
+                              transform_workers=int(getattr(cfg.ssl, &#x27;portal_transform_workers&#x27;, 0)))
+        if nw and stream.transform_workers:
+            raise ValueError(&#x27;Use portal_num_workers=0 with parallel transform workers&#x27;)
+        loader_kwargs = dict(batch_size=None, num_workers=nw,
+                             pin_memory=(dev == &#x27;cuda&#x27;),
+                             generator=torch.Generator().manual_seed(int(cfg.seed)))
+        if nw:
+            # Exactly one worker is supported: it prepares the next batch while
+            # the GPU trains. A fresh worker each epoch inherits the committed
+            # parent cursor; persistent workers would retain a stale cursor.
+            if nw != 1:
+                raise ValueError(&#x27;portal_zip requires num_workers 0 or 1&#x27;)
+            loader_kwargs.update(prefetch_factor=1, persistent_workers=False)
+        dl = torch.utils.data.DataLoader(stream, **loader_kwargs)
+        return dl, len(stream.sizes)</code></pre>
+<p>The <code>portal_zip</code> branch of <code>_make_loader</code> is where <code>PortalStream</code>
+actually gets wired into a Lightning-compatible <code>DataLoader</code>. Notable constraint enforced here:
+<strong>exactly one</strong> DataLoader worker is supported when <code>num_workers &gt; 0</code>
+(<code>if nw != 1: raise ValueError(...)</code>) &mdash; that single worker prepares the next batch while the
+GPU trains on the current one; parallelism inside a batch instead comes from
+<code>PortalStream</code>&rsquo;s own <code>transform_workers</code> process pool. A fresh DataLoader worker
+process is spawned each epoch (<code>persistent_workers=False</code>) deliberately: a persistent worker
+would retain a stale in-process copy of the stream&rsquo;s cursor across a resume, rather than picking up the
+just-restored one from the parent.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:181-202</div><pre><code>def llrd_param_groups(backbone, other_params, base_lr, decay):
+    blocks = backbone.trunk.blocks
+    depth = len(blocks)
+    groups, seen = [], set()
+
+    def add(params, scale):
+        ps = [p for p in params if p.requires_grad and id(p) not in seen]
+        for p in ps:
+            seen.add(id(p))
+        if ps:
+            groups.append({&quot;params&quot;: ps, &quot;lr&quot;: base_lr * scale})
+
+    add(other_params, 1.0)
+    add([p for n, p in backbone.trunk.named_parameters()
+         if n.startswith((&quot;patch_embed&quot;, &quot;pos_embed&quot;, &quot;cls_token&quot;, &quot;reg_token&quot;))],
+        decay ** (depth + 1))
+    for i, blk in enumerate(blocks):
+        add(list(blk.parameters()), decay ** (depth - i))
+    add([p for n, p in backbone.trunk.named_parameters()
+         if n.startswith((&quot;norm&quot;, &quot;fc_norm&quot;, &quot;head&quot;, &quot;attn_pool&quot;))], 1.0)
+    add(backbone.trunk.parameters(), decay ** (depth + 1))  # any stragglers
+    return groups</code></pre>
+<p><code>llrd_param_groups</code> builds the layer-wise-LR-decay optimizer groups: the backbone&rsquo;s
+transformer blocks each get their own param group scaled by <code>decay ** (depth - i)</code> (deeper blocks
+&mdash; closer to the output &mdash; get a higher effective LR, shallower/earlier blocks get decayed further
+toward zero, the standard LLRD scheme for fine-tuning pretrained transformers). The
+<code>seen</code>/<code>add()</code> bookkeeping exists purely to guarantee every parameter lands in exactly
+one group &mdash; important because <code>torch.optim.AdamW</code> silently double-updates a parameter that
+appears in two groups, which would be a very quiet bug to have shipped.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:302-341</div><pre><code>class SSLModule(pl.LightningModule):
+    def __init__(self, cfg, args, out_dir, total_steps):
+        super().__init__()
+        self.cfg, self.args, self.out_dir = cfg, args, out_dir
+        self.total_steps = total_steps
+        self.automatic_optimization = False  # LLRD groups + EMA/teacher updates need manual control
+        self._limit_hit = False
+
+        backbone = build_vit_b16(args.init, cfg, pretrained_init=True)
+        # grad checkpointing trades compute for GPU memory; it&#x27;s pointless on
+        # CPU (no memory pressure at these batch sizes) and its reentrant
+        # backward is the prime suspect for an intermittent CPU hang inside
+        # the optimizer step right after (reproduced repeatedly; foreach=False
+        # alone did not fix it -- see docs/PLAN.md debugging notes).
+        if torch.cuda.is_available() and str(getattr(cfg.ssl, &#x27;grad_checkpointing&#x27;, True)).lower() in (&#x27;true&#x27;, &#x27;1&#x27;):
+            backbone.set_grad_checkpointing(True)
+        if args.lora:
+            backbone = _maybe_lora(backbone)
+        self.backbone = backbone
+        d = backbone.embed_dim
+
+        if args.objective == &quot;lejepa&quot;:
+            lp = cfg.ssl.lejepa
+            self.proj = Projector(d, int(lp.proj_dim))
+            self.pred = Predictor(int(lp.proj_dim), int(lp.pred_hidden_mult))
+            self.aux = nn.ModuleList([self.proj, self.pred])
+            self.teacher, self.teacher_net = None, None
+            ema_bb = EMA(self.backbone, base_decay=float(cfg.ssl.ema_base))
+            self.ema_bb, self.ema_bb_net = ema_bb, ema_bb.ema  # registers as a submodule
+        else:
+            dp = cfg.ssl.dino
+            self.head = DINOHead(d, int(dp.out_dim))
+            self.aux = nn.ModuleList([self.head])
+            student = nn.ModuleDict({&quot;bb&quot;: self.backbone, &quot;head&quot;: self.head})
+            teacher = EMA(student, base_decay=0.996)
+            self.teacher, self.teacher_net = teacher, teacher.ema  # registers as a submodule
+            self.ema_bb, self.ema_bb_net = None, None
+            self.register_buffer(&quot;center&quot;, torch.zeros(int(dp.out_dim)))
+
+        self.other_params = [p for m in self.aux for p in m.parameters()]</code></pre>
+<p><code>SSLModule.__init__</code>. The grad-checkpointing comment here is worth reading closely &mdash; it
+records that reentrant backward under gradient checkpointing was the prime suspect for an intermittent CPU
+hang inside the optimizer step (reproduced repeatedly on the shared login node; disabling
+<code>foreach</code> alone did not fix it), and that grad checkpointing is otherwise pointless on GPU at this
+batch size (no memory pressure forcing the trade). It defaults <code>true</code> for backward
+compatibility but the full-corpus launch explicitly sets <code>GRAD_CKPT=false</code>
+(<code>lrz/fullstream_env.sh</code>) once the pilot phase confirmed memory wasn&rsquo;t the bottleneck.
+Branching on <code>args.objective</code>: LeJEPA gets a projector + predictor and an EMA-averaged copy of
+just the backbone (<code>self.ema_bb</code>, since LeJEPA has no separate teacher network, only a
+stop-gradient target); DINO gets a projection head plus a full EMA-averaged copy of
+<code>{backbone, head}</code> as the teacher network, plus a registered <code>center</code> buffer for
+teacher-output centering (so it checkpoints/resumes automatically as part of the module state, no separate
+bookkeeping needed).</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:344-366</div><pre><code>    def configure_optimizers(self):
+        cfg = self.cfg
+        groups = llrd_param_groups(self.backbone, self.other_params,
+                                   float(cfg.ssl.base_lr), float(cfg.ssl.llrd))
+        # foreach=False only on CPU: the batched foreach/fused AdamW kernels were
+        # seen to intermittently hang on the shared login node right after a
+        # backward pass (non-deterministic). On a GPU the batched kernels are a
+        # real speedup and the hang was never reproduced there, so keep the
+        # default (foreach=None -&gt; batched).
+        fe = False if not torch.cuda.is_available() else None
+        opt = torch.optim.AdamW(groups, lr=float(cfg.ssl.base_lr),
+                                weight_decay=float(cfg.ssl.weight_decay), foreach=fe)
+        self._base_lrs = [g[&quot;lr&quot;] for g in opt.param_groups]
+        return opt
+
+    def _set_lr(self, opt) -&gt; float:
+        cfg = self.cfg
+        warmup = int(cfg.ssl.warmup_frac * self.total_steps)
+        lr = cosine_lr(self.global_step, self.total_steps, 1.0,
+                       float(cfg.ssl.min_lr) / float(cfg.ssl.base_lr), warmup)
+        for g, b in zip(opt.param_groups, self._base_lrs):
+            g[&quot;lr&quot;] = b * lr
+        return opt.param_groups[0][&quot;lr&quot;]</code></pre>
+<p><code>configure_optimizers</code>/<code>_set_lr</code>. The <code>foreach=False</code>-on-CPU-only line
+is the third and final piece of the same CPU-hang defense mentioned above (alongside grad-checkpointing being
+gated and the single-threaded CPU smoke path in <code>train()</code>) &mdash; the batched/fused AdamW
+kernels were suspected in the same intermittent hang and are disabled only where the hang was actually
+observed (CPU), never on the real GPU training target where the speedup is real and the hang was never
+reproduced. <code>_set_lr</code> applies the cosine schedule (<code>cosine_lr</code>, &sect;4.4) to every
+param group by re-scaling from each group&rsquo;s own LLRD base LR, recomputed fresh every step from
+<code>self.global_step</code> &mdash; which only means what it should because of the
+<span class="commit">ccb8985</span> fix (&sect;2).</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:369-467</div><pre><code>    def training_step(self, batch, batch_idx):
+        cursor = None
+        if isinstance(batch, dict):
+            self.log(&#x27;portal/data_wait_seconds&#x27;, float(batch.get(&#x27;data_wait_seconds&#x27;, 0)))
+            cursor = batch[&#x27;cursor&#x27;]
+            portal_transferred = float(batch.get(&#x27;transferred_bytes&#x27;, 0))
+            portal_cache_peak = float(batch.get(&#x27;cache_reserved_peak&#x27;, 0))
+            batch = batch[&#x27;views&#x27;]
+        self._probe = batch[0][:16].detach().cpu()
+        cfg, opt = self.cfg, self.optimizers()
+        cur_lr = self._set_lr(opt)
+        gstep = self.global_step
+
+        if self.args.objective == &quot;lejepa&quot;:
+            v1, v2 = batch[0], batch[1]
+            z1, z2 = self.proj(self.backbone.feature(v1)), self.proj(self.backbone.feature(v2))
+            loss, parts = lejepa_loss(
+                z1, z2, self.pred,
+                sigreg_lambda=float(cfg.ssl.lejepa.sigreg_lambda),
+                var_weight=float(cfg.ssl.lejepa.var_weight),
+                n_slices=int(cfg.ssl.lejepa.sigreg_slices),
+                n_freq=int(cfg.ssl.lejepa.sigreg_freqs),
+            )
+            t_out = None
+        else:
+            dp = cfg.ssl.dino
+            crops = batch
+            t_temp = teacher_temp_at(gstep, self.total_steps, float(dp.teacher_temp),
+                                     float(dp.teacher_temp_final),
+                                     float(dp.teacher_temp_warmup_frac))
+            s_out = [self.head(self.backbone.feature(c)) for c in crops]
+            with torch.no_grad():
+                t_out = [self.teacher_net[&quot;head&quot;](self.teacher_net[&quot;bb&quot;].feature(crops[0])),
+                         self.teacher_net[&quot;head&quot;](self.teacher_net[&quot;bb&quot;].feature(crops[1]))]
+            loss = dino_loss(s_out, t_out, self.center, float(dp.student_temp), t_temp)
+            parts = {&quot;dino&quot;: float(loss.detach())}
+
+        if not torch.isfinite(loss):
+            if cursor is not None:
+                raise RuntimeError(&#x27;Non-finite portal training loss; stopping&#x27;)
+            print(f&quot;  [skip] non-finite loss @ step {gstep}&quot;)
+            opt.zero_grad(set_to_none=True)
+            return None
+
+        self.manual_backward(loss)
+        self.clip_gradients(opt, gradient_clip_val=float(cfg.ssl.grad_clip),
+                            gradient_clip_algorithm=&quot;norm&quot;)
+        # GPU (the real training target): the normal LightningOptimizer step, so
+        # trainer.global_step advances. The LR / teacher-temp / EMA-momentum
+        # schedules AND ModelCheckpoint(every_n_train_steps) all key off
+        # global_step; the raw opt.optimizer.step() below leaves it pinned at 0
+        # -&gt; LR frozen at 0 -&gt; the model never trains and no checkpoint fires.
+        # Keep the raw-step bypass ONLY for CPU login-node smokes, where an
+        # intermittent post-backward hang in the LightningOptimizer step path
+        # was seen (docs/PLAN.md) and never reproduced on GPU; foreach=False
+        # (configure_optimizers) + single-thread (train()) are the other
+        # CPU-only guards.
+        if torch.cuda.is_available() or cursor is not None:
+            opt.step()
+        else:
+            opt.optimizer.step()
+        opt.zero_grad(set_to_none=True)
+
+        if self.global_step - self._rate_step &gt;= 100:
+            elapsed = time.monotonic() - self._rate_time
+            rate = (self.global_step - self._rate_step) / max(elapsed, 1e-6)
+            print(f&#x27;[throughput] step={self.global_step} steps_per_second={rate:.4f} &#x27;
+                  f&#x27;window_seconds={elapsed:.1f}&#x27;, flush=True)
+            self.log(&#x27;perf/window_steps_per_second&#x27;, rate)
+            self._rate_step, self._rate_time = self.global_step, time.monotonic()
+
+        if self.ema_bb is not None:
+            self.ema_bb.update(self.backbone)
+        if self.teacher is not None:
+            m = cosine_momentum(gstep, self.total_steps, 0.996)
+            student = nn.ModuleDict({&quot;bb&quot;: self.backbone, &quot;head&quot;: self.head})
+            self.teacher.update(student, decay=m)
+            update_center(self.center, [o.detach() for o in t_out], float(cfg.ssl.dino.center_momentum))
+
+        self.log(&quot;loss&quot;, loss, prog_bar=True, on_step=True, on_epoch=False)
+        for k, v in parts.items():
+            self.log(f&quot;loss/{k}&quot;, v, on_step=True, on_epoch=False)
+        self.log(&quot;lr&quot;, cur_lr, on_step=True, on_epoch=False)
+        if cursor is not None:
+            self.trainer.datamodule._dl.dataset.commit(cursor)
+            # These counters come from the worker process when prefetching is
+            # enabled; the parent&#x27;s client/cache objects are separate copies.
+            self.log(&#x27;portal/transferred_bytes&#x27;, portal_transferred)
+            self.log(&#x27;portal/cache_reserved_peak&#x27;, portal_cache_peak)
+
+        if (gstep + 1) % int(cfg.ssl.ckpt_every_steps) == 0:
+            self.save_eval_backbone()
+        if self.args.limit_steps and (gstep + 1) &gt;= self.args.limit_steps:
+            print(f&quot;[pretrain] --limit-steps {self.args.limit_steps} reached&quot;)
+            self._limit_hit = True
+            self.save_eval_backbone()
+            self.trainer.should_stop = True
+
+        return loss</code></pre>
+<p><code>training_step</code> in full &mdash; the single most load-bearing function in the file, and the
+one that both major training bugs (&sect;2, <span class="commit">ccb8985</span>) lived in. Reading it top to
+bottom: unwrap the portal batch dict if present (carrying the resume cursor and telemetry alongside the
+actual crop tensors); compute the current LR; branch on objective to get a loss + a dict of loss components
+for logging; on a non-finite loss, <strong>portal-sourced batches raise</strong> (a NaN this deep into a
+multi-day run means something is actually wrong and silently skipping it would hide that) while
+<strong>non-portal batches just skip the step</strong> (kept from before the portal path existed, for
+smoke-test tolerance); manual backward + grad clipping; then the <code>opt.step()</code> vs
+<code>opt.optimizer.step()</code> branch that <span class="commit">ccb8985</span> fixed, now with its
+full post-fix reasoning inline as a comment so a future re-read doesn&rsquo;t reintroduce the bug by
+"simplifying" it back to the raw call. EMA/teacher updates and center update happen after the optimizer
+step, using the freshly-updated backbone. <code>cursor is not None</code> gates the
+<code>self.trainer.datamodule._dl.dataset.commit(cursor)</code> call &mdash; the portal stream&rsquo;s
+progress is only ever advanced from inside a successful training step, never speculatively.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:496-525</div><pre><code>    def on_save_checkpoint(self, checkpoint):
+        import random
+        import numpy as np
+        ds = getattr(self.trainer.datamodule._dl, &#x27;dataset&#x27;, None)
+        if hasattr(ds, &#x27;state_dict&#x27;):
+            checkpoint[&#x27;portal_cursor&#x27;] = ds.state_dict()
+            checkpoint[&#x27;portal_rng&#x27;] = (random.getstate(), np.random.get_state(), torch.get_rng_state(),
+                                       torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [])
+
+    def on_load_checkpoint(self, checkpoint):
+        if &#x27;portal_cursor&#x27; in checkpoint:
+            self.trainer.datamodule._dl.dataset.load_state_dict(checkpoint[&#x27;portal_cursor&#x27;])
+        self._portal_restore = checkpoint
+
+    def on_train_start(self):
+        self._train_started = time.monotonic()
+        self._train_start_step = self.global_step
+        self._rate_step, self._rate_time = self.global_step, time.monotonic()
+        import random
+        import numpy as np
+        checkpoint = getattr(self, &#x27;_portal_restore&#x27;, {})
+        if &#x27;portal_cursor&#x27; in checkpoint:
+            self.trainer.datamodule._dl.dataset.load_state_dict(checkpoint[&#x27;portal_cursor&#x27;])
+            py, npstate, cpu, cuda = checkpoint[&#x27;portal_rng&#x27;]
+            random.setstate(py)
+            np.random.set_state(npstate)
+            torch.set_rng_state(cpu.cpu())
+            if cuda:
+                torch.cuda.set_rng_state_all([x.cpu() for x in cuda])
+        self._portal_restore = None</code></pre>
+<p><code>on_save_checkpoint</code>/<code>on_load_checkpoint</code>/<code>on_train_start</code> round-trip
+the portal stream&rsquo;s cursor <em>and</em> the full RNG state (Python <code>random</code>, NumPy, torch
+CPU, torch CUDA) through the Lightning checkpoint &mdash; this is what makes a resumed run&rsquo;s
+augmentations bit-for-bit continuous with where it left off, not just "resume from roughly the same corpus
+position with fresh randomness." <code>on_train_start</code> is where the restore actually applies (not
+<code>on_load_checkpoint</code> itself) because the dataset object doesn&rsquo;t exist yet at
+checkpoint-load time inside Lightning&rsquo;s startup sequence &mdash; the checkpoint dict is stashed on
+<code>self._portal_restore</code> and applied once the datamodule is actually set up.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:536-562</div><pre><code>    def save_eval_backbone(self):
+        ds = getattr(self.trainer.datamodule._dl, &#x27;dataset&#x27;, None)
+        metadata = {&#x27;run_tag&#x27;: self.args.run_tag,
+                    &#x27;ssl_base_lr&#x27;: float(self.cfg.ssl.base_lr),
+                    &#x27;ssl_min_lr&#x27;: float(self.cfg.ssl.min_lr), &#x27;ssl_llrd&#x27;: float(self.cfg.ssl.llrd)}
+        if hasattr(ds, &#x27;manifest&#x27;) and isinstance(ds.manifest, dict):
+            metadata.update(source=&#x27;portal_zip&#x27;, ssl_source=&#x27;portal_zip&#x27;, preprocessing=&#x27;raw&#x27;,
+                            manifest_fingerprint=ds.manifest[&#x27;fingerprint&#x27;],
+                            train_shards=len(ds.manifest[&#x27;archives&#x27;]),
+                            completed_epochs=ds.cursor[&#x27;epoch&#x27;],
+                            images_per_epoch=sum(ds.sizes), cursor=ds.state_dict(),
+                            transferred_bytes=ds.client.transferred_bytes,
+                            cache_peak_bytes=ds.cache.peak)
+            metadata[&#x27;coverage&#x27;] = ds.coverage()
+        trunk = (self.teacher_net[&quot;bb&quot;].trunk if self.teacher is not None
+                 else self.ema_bb_net.trunk)
+        torch.save(
+            {&quot;ema_backbone&quot;: trunk.state_dict(), &quot;init&quot;: self.args.init,
+             &quot;objective&quot;: self.args.objective, &quot;corpus&quot;: self.args.corpus,
+             &quot;gstep&quot;: self.global_step, &quot;run_tag&quot;: getattr(self.args, &quot;run_tag&quot;, &quot;&quot;),
+             &quot;training_metadata&quot;: metadata,
+             &quot;provenance&quot;: provenance(int(self.cfg.seed), objective=self.args.objective,
+                                      init=self.args.init, corpus=self.args.corpus)},
+            os.path.join(self.out_dir, &quot;ema_backbone.pt.tmp&quot;),
+        )
+        os.replace(os.path.join(self.out_dir, &#x27;ema_backbone.pt.tmp&#x27;),
+                   os.path.join(self.out_dir, &#x27;ema_backbone.pt&#x27;))</code></pre>
+<p><code>save_eval_backbone</code> writes the one artifact everything downstream depends on:
+<code>ema_backbone.pt</code>, atomically (write to <code>.tmp</code>, then <code>os.replace</code>). Its
+shape is explicitly documented (module docstring, &sect;4.3 header) as unchanged from before the Lightning
+port &mdash; eval code depends on this exact structure, so it can&rsquo;t drift just because the training
+loop around it changed. The <code>metadata</code> block records everything needed to audit a checkpoint
+later without re-running anything: manifest fingerprint, shard/archive count, completed epochs, the full
+cursor, cumulative transferred bytes, cache peak &mdash; this is the source of the
+&ldquo;0 / 13,383,770 decode attempts failed&rdquo; figure quoted in &sect;3.1 and &sect;6.</p>
+<div class="codehdr">vlfz/ssl/pretrain.py:656-691</div><pre><code>        callbacks.append(PortalWalltime())
+    trainer = pl.Trainer(
+        accelerator=(&quot;gpu&quot; if dev == &quot;cuda&quot; else &quot;cpu&quot;), devices=1,
+        precision=(&quot;bf16-mixed&quot; if dev == &quot;cuda&quot; else 32),
+        # bound on absolute global_step, not epochs: on resume from last.ckpt
+        # Lightning restores global_step but its iterable-dataloader epoch counter
+        # resets, so `max_epochs` would run a FRESH `epochs` epochs after a resume
+        # (a run that TIMEOUT&#x27;d at 1 epoch then resumed did ~4 epochs total).
+        # max_steps=total_steps makes &quot;3 epochs&quot; mean 3*steps_per_epoch of training
+        # regardless of how many allocations it took.
+        max_epochs=-1, max_steps=(args.limit_steps or total_steps),
+        default_root_dir=out_dir, callbacks=callbacks, logger=loggers,
+        plugins=[AtomicCheckpointIO()],
+        enable_progress_bar=True, log_every_n_steps=50,
+        num_sanity_val_steps=0,
+    )
+    trainer.fit(model, datamodule=dm, ckpt_path=resume_from, weights_only=False)
+
+    if not model._limit_hit:
+        if args.source == &#x27;portal_zip&#x27; and dm._dl.dataset.cursor[&#x27;epoch&#x27;] != epochs:
+            raise RuntimeError(&#x27;Training ended without three complete portal passes&#x27;)
+        open(done_flag, &quot;w&quot;).write(__import__(&quot;time&quot;).strftime(&quot;%Y-%m-%d %H:%M:%S\n&quot;))
+        print(f&quot;[pretrain] DONE -&gt; {out_dir}/ema_backbone.pt&quot;)
+        # Reclaim the resume/periodic checkpoints (~1.4 GB each) now that the run
+        # is finished -- eval only ever loads ema_backbone.pt. Four runs each
+        # leaving last.ckpt + ckpt-step=*.ckpt filled the home quota and killed
+        # a resume mid-checkpoint (OSError 28). Keep ema_backbone.pt + tb/ + DONE.
+        import glob as _glob
+
+        for _f in [os.path.join(out_dir, &quot;last.ckpt&quot;), *_glob.glob(os.path.join(out_dir, &quot;ckpt-*.ckpt&quot;))]:
+            try:
+                os.remove(_f)
+                print(f&quot;[pretrain] cleaned {os.path.basename(_f)}&quot;)
+            except OSError:
+                pass
+    return out_dir</code></pre>
+<p><code>train()</code>&rsquo;s trainer construction, showing the <span class="commit">f898184</span> fix
+(&sect;2) with its full reasoning as an inline comment, and the post-<code>DONE</code> checkpoint cleanup
+(<span class="commit">e7f9df3</span>, &sect;2/WS4) right after it. The
+<code>if args.source == 'portal_zip' and dm._dl.dataset.cursor['epoch'] != epochs</code> guard is a final
+sanity check before declaring victory: even with <code>max_steps</code> bounding total optimizer steps
+correctly, this independently confirms the portal stream actually completed the intended number of full
+passes over the manifest, not just the intended step count (the two could in principle diverge if
+<code>batch_sizes()</code>&rsquo; tail-merge logic or a resume boundary interacted unexpectedly) &mdash;
+belt-and-braces on the exact-coverage guarantee the whole fullstream design exists to provide.</p>
+<hr class="sep">
+
+<h3 id="lejepa-code">4.4 <code>vlfz/ssl/lejepa_lib.py</code> and <code>vlfz/ssl/dino_lib.py</code> &mdash; the objectives</h3>
+<p>Both shown in full &mdash; each is under 80 lines and every function in them is load-bearing for the
+DINO-vs-LeJEPA result in &sect;6, so partial excerpts would lose more than they&rsquo;d save.</p>
+<div class="codehdr">vlfz/ssl/lejepa_lib.py</div><pre><code>&quot;&quot;&quot;LeJEPA objective (Balestriero &amp; LeCun 2025, arXiv:2511.08544).
+
+    loss = prediction_loss + sigreg_lambda * SIGReg + var_weight * variance_hinge
+
+- prediction_loss : two augmented views embedded by the SAME encoder (no EMA
+  teacher). A small predictor maps view A&#x27;s embedding toward view B&#x27;s, and
+  symmetrically. The TARGET is stop-gradient&#x27;d so the invariance term cannot be
+  minimised by shrinking embeddings toward a constant.
+
+- SIGReg (Sketched Isotropic Gaussian Regularization) : project the standardized
+  batch onto many random 1-D directions and push each 1-D marginal toward a
+  standard Gaussian via the Epps-Pulley characteristic-function test. By
+  Cramer-Wold, matching all 1-D projections matches the full isotropic Gaussian.
+  Cost is linear in dim and batch. Vectorized over slices/frequencies.
+
+- variance_hinge : an explicit, numerically-stable VICReg-style floor on
+  per-feature std (belt-and-braces anti-collapse; SIGReg shapes, this guards).
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import torch
+import torch.nn.functional as F
+
+
+def _standardize(z: torch.Tensor, eps: float = 1e-3) -&gt; torch.Tensor:
+    std = z.std(dim=0, keepdim=True).clamp_min(eps)
+    return (z - z.mean(dim=0, keepdim=True)) / std
+
+
+def variance_hinge(z: torch.Tensor, target_std: float = 1.0, eps: float = 1e-4) -&gt; torch.Tensor:
+    std = torch.sqrt(z.var(dim=0) + eps)
+    return torch.relu(target_std - std).mean()
+
+
+def sigreg(z: torch.Tensor, n_slices: int = 256, n_freq: int = 16,
+          freq_max: float = 5.0) -&gt; torch.Tensor:
+    &quot;&quot;&quot;Sketched Isotropic Gaussian Regularization. 0 iff every sampled 1-D
+    projection of the standardized batch looks standard-Gaussian.&quot;&quot;&quot;
+    N, D = z.shape
+    zc = _standardize(z)
+    dirs = torch.randn(D, n_slices, device=z.device, dtype=z.dtype)
+    dirs = dirs / (dirs.norm(dim=0, keepdim=True) + 1e-8)
+    proj = zc @ dirs                                            # (N, S)
+    ts = torch.linspace(0.1, freq_max, n_freq, device=z.device, dtype=z.dtype)
+    tx = proj[:, :, None] * ts[None, None, :]                   # (N, S, T)
+    ecf_re = torch.cos(tx).mean(dim=0)                          # (S, T)
+    ecf_im = torch.sin(tx).mean(dim=0)                          # (S, T)
+    cf_re = torch.exp(-0.5 * ts ** 2)[None, :]                  # std-normal CF (real)
+    weight = torch.exp(-0.5 * ts ** 2)[None, :]                 # Gaussian integration weight
+    diff = (ecf_re - cf_re) ** 2 + ecf_im ** 2
+    return (diff * weight).mean()
+
+
+def prediction_loss(emb_a: torch.Tensor, emb_b: torch.Tensor, predictor) -&gt; torch.Tensor:
+    pa = predictor(emb_a)
+    pb = predictor(emb_b)
+    return 0.5 * (
+        F.smooth_l1_loss(pa, emb_b.detach()) + F.smooth_l1_loss(pb, emb_a.detach())
+    )
+
+
+def lejepa_loss(emb_a, emb_b, predictor, *, sigreg_lambda=1.0, var_weight=1.0,
+                n_slices=256, n_freq=16):
+    pred = prediction_loss(emb_a, emb_b, predictor)
+    reg = 0.5 * (sigreg(emb_a, n_slices, n_freq) + sigreg(emb_b, n_slices, n_freq))
+    var = 0.5 * (variance_hinge(emb_a) + variance_hinge(emb_b))
+    total = pred + sigreg_lambda * reg + var_weight * var
+    return total, {&quot;pred&quot;: float(pred.detach()), &quot;sigreg&quot;: float(reg.detach()),
+                   &quot;var&quot;: float(var.detach())}
+
+
+@torch.no_grad()
+def effective_rank(z: torch.Tensor) -&gt; float:
+    &quot;&quot;&quot;Collapse proxy: exp(entropy of normalized singular values). Full rank -&gt; ~D.&quot;&quot;&quot;
+    z = z - z.mean(0, keepdim=True)
+    s = torch.linalg.svdvals(z.float())
+    p = s / s.sum().clamp_min(1e-12)
+    return float(torch.exp(-(p * (p.clamp_min(1e-12)).log()).sum()))</code></pre>
+<p>LeJEPA (Balestriero &amp; LeCun 2025) has no EMA teacher at all &mdash; both augmented views go through the
+<em>same</em> encoder, and collapse is prevented by two explicit regularizers instead of an asymmetric
+architecture. <code>prediction_loss</code> is the JEPA part: a small predictor maps one view&rsquo;s embedding
+toward the other&rsquo;s, symmetrically, with the target always <code>.detach()</code>&rsquo;d so the
+invariance term can&rsquo;t be trivially minimized by collapsing both embeddings to a constant.
+<code>sigreg</code> (SIGReg &mdash; Sketched Isotropic Gaussian Regularization) is the more novel piece: it
+projects the standardized batch onto <code>n_slices</code> random 1-D directions and, for each, compares the
+empirical characteristic function against a standard Gaussian&rsquo;s via the Epps-Pulley test
+(<code>ecf_re</code>/<code>ecf_im</code> vs. the closed-form Gaussian CF <code>cf_re</code>, weighted by a
+Gaussian kernel in frequency). By the Cramer-Wold theorem, matching every 1-D projection&rsquo;s distribution
+is equivalent to matching the full isotropic Gaussian in the original space &mdash; and because it&rsquo;s
+computed over random <em>projections</em> rather than the full covariance structure, cost stays linear in
+both batch size and embedding dimension. <code>variance_hinge</code> is a simpler VICReg-style floor on
+per-feature standard deviation, kept as an explicit "belt and braces" anti-collapse guard on top of what
+SIGReg already provides shape-wise. <code>effective_rank</code> (exponentiated entropy of the normalized
+singular-value spectrum of a feature batch) is the collapse-monitoring metric logged every epoch as
+<code>collapse/effective_rank</code> &mdash; this is what the selection gate in &sect;6 checks did not
+collapse for either setting.</p>
+<div class="codehdr">vlfz/ssl/dino_lib.py</div><pre><code>&quot;&quot;&quot;DINO v1 self-distillation objective + schedules (Caron et al. 2021).
+
+A student matches an EMA teacher&#x27;s sharpened, centered output distribution across
+multiple augmented crops of the same image (2 global + n_local). No labels, no
+negatives; centering + teacher sharpening prevent collapse.
+&quot;&quot;&quot;
+from __future__ import annotations
+
+import math
+
+import torch
+import torch.nn.functional as F
+
+
+def dino_loss(
+        student_out: list[torch.Tensor], 
+        teacher_out: list[torch.Tensor],
+        center: torch.Tensor, 
+        student_temp: float, 
+        teacher_temp: float
+) -&gt; torch.Tensor:
+    &quot;&quot;&quot;student_out: over ALL crops; teacher_out: over the 2 GLOBAL crops. CE of
+    every student crop vs every teacher crop, skipping the identical view.&quot;&quot;&quot;
+    t = [F.softmax((tt - center) / teacher_temp, dim=-1).detach() for tt in teacher_out]
+    total, n = 0.0, 0
+    for ti, tq in enumerate(t):
+        for si, sq in enumerate(student_out):
+            if si == ti:
+                continue
+            total = total + (-(tq * F.log_softmax(sq / student_temp, dim=-1)).sum(-1).mean())
+            n += 1
+    return total / max(1, n)
+
+
+
+
+
+
+@torch.no_grad()
+def update_center(center: torch.Tensor, teacher_out: list[torch.Tensor],
+                 momentum: float) -&gt; torch.Tensor:
+    batch_center = torch.cat(teacher_out, dim=0).mean(dim=0)
+    center.mul_(momentum).add_(batch_center, alpha=1.0 - momentum)
+    return center
+
+
+
+
+
+
+def cosine_lr(step: int, total: int, base_lr: float, min_lr: float, warmup: int) -&gt; float:
+    if step &lt; warmup:
+        return base_lr * step / max(1, warmup)
+    p = (step - warmup) / max(1, total - warmup)
+    return min_lr + 0.5 * (base_lr - min_lr) * (1 + math.cos(math.pi * p))
+
+
+
+
+
+
+def teacher_temp_at(step: int, total: int, t0: float, t1: float, warmup_frac: float) -&gt; float:
+    frac = step / max(1, total)
+    return t0 + (t1 - t0) * min(1.0, frac / max(1e-6, warmup_frac))</code></pre>
+<p>DINO v1 (Caron et al. 2021) is the more classical self-distillation setup: a student matches an EMA
+teacher&rsquo;s sharpened, centered output distribution across every augmented crop (2 global + several
+local) except a crop matched against itself. <code>dino_loss</code>&rsquo;s double loop explicitly skips
+<code>si == ti</code> &mdash; the identical-view pair &mdash; since matching a view against its own teacher
+output trivially would leak no learning signal and would also make the temperature-controlled sharpening
+term degenerate. <code>update_center</code> is the other collapse-prevention mechanism, alongside teacher
+sharpening: an EMA-averaged running mean of teacher outputs is subtracted before softmax, which stops the
+teacher from collapsing to a single/near-constant output distribution &mdash; this is exactly the term
+flagged in <code>docs/PLAN.md</code> as the reason multi-GPU DDP was <em>not</em> pursued (&sect;1.3): it
+batch-means locally with no cross-rank reduction, so naive DDP would let each rank drift to its own center.
+<code>teacher_temp_at</code> linearly warms the teacher&rsquo;s softmax temperature from
+<code>t0</code> to a lower, sharper <code>t1</code> over the first <code>warmup_frac</code> of training
+&mdash; starting soft (easier for the student to match early) and sharpening over time (forcing more
+confident, more discriminative teacher targets as training progresses).</p>
+<hr class="sep">
+
+<h3 id="gastronet-code">4.5 <code>vlfz/data/gastronet.py</code> &mdash; the WebDataset tier (superseded path)</h3>
+<p>This file is the loader for the two <em>curated</em> read paths
+(<code>local_webdataset</code>/<code>s3_webdataset</code>) that preceded and coexist with
+<code>portal_zip</code>. It is not what the final full-corpus runs used, but it is still what the earlier
+subset-era 4-setting result (&sect;1.2) trained against, and its <code>with_epoch</code> bug
+(<span class="commit">ccb8985</span>, &sect;2) is one of the two bugs that made the first full run train on
+nothing.</p>
+<div class="codehdr">vlfz/data/gastronet.py:179-224</div><pre><code>def webdataset_loader(cfg, transform, collate, *, source, batch_size, num_workers,
+                      steps_per_epoch, shuffle_buf=2000, seed=0):
+    &quot;&quot;&quot;A DataLoader over the curated .tar tier. Yields the same crop-major list of
+    stacked tensors as ``multicrop_collate`` — drop-in for the map-style path.
+
+    ``s3_webdataset`` streams each shard over a presigned HTTPS GET and caches it
+    to ``ssl.wds_cache_dir`` on first read (``url_to_cache_name`` keys the cache
+    file on the S3 *path*, so it&#x27;s stable across presign regenerations) — epoch 1
+    pays the S3 egress, every later epoch or job resubmit reads local disk.&quot;&quot;&quot;
+    import webdataset as wds
+
+    urls = webdataset_shards(cfg, source)
+    cache_kw = {}
+    if source == &quot;s3_webdataset&quot;:
+        cache_dir = os.path.expanduser(str(getattr(cfg.ssl, &quot;wds_cache_dir&quot;, &quot;~/.cache/wds&quot;)))
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_kw = {&quot;cache_dir&quot;: cache_dir,
+                    &quot;cache_size&quot;: int(getattr(cfg.ssl, &quot;wds_cache_size_bytes&quot;, -1)),
+                    &quot;url_to_name&quot;: wds.cache.url_to_cache_name}
+
+    def _decode(sample):
+        from PIL import Image
+
+        key = [k for k in sample if k.split(&quot;.&quot;)[-1] in (&quot;jpg&quot;, &quot;jpeg&quot;, &quot;png&quot;, &quot;webp&quot;)][0]
+        img = Image.open(io.BytesIO(sample[key])).convert(&quot;RGB&quot;)
+        return transform(img)
+
+    ds = (
+        wds.WebDataset(urls, resampled=True, shardshuffle=False,
+                       nodesplitter=wds.split_by_node,
+                       workersplitter=wds.split_by_worker, seed=seed,
+                       handler=wds.warn_and_continue, **cache_kw)
+        .shuffle(shuffle_buf)
+        .map(_decode, handler=wds.warn_and_continue)
+        .batched(batch_size, collation_fn=collate, partial=False)
+    )
+
+    # .with_epoch() has to bound the COMBINED stream, not the per-worker
+    # pipeline. With num_workers=N the whole dataset pipeline runs inside every
+    # worker, so ds.with_epoch(k) yields N*k batches per Lightning epoch (with
+    # N=12 that made &quot;epoch 0&quot; ~56k batches and no epoch-end / schedule / ckpt
+    # ever fired within the wall clock). WebLoader.with_epoch() is applied after
+    # the multiprocessing fan-in -&gt; exactly steps_per_epoch batches per epoch.
+    dl = wds.WebLoader(ds, batch_size=None, num_workers=num_workers,
+                       pin_memory=True, persistent_workers=(num_workers &gt; 0))
+    return dl.with_epoch(steps_per_epoch)</code></pre>
+<p><code>webdataset_loader</code>, post-fix. The <code>resampled=True</code> mode (samples shards <em>with
+replacement</em>, an infinite stream cut to a fixed <code>steps_per_epoch</code>) was the original default
+and is what the published subset-era comparison used &mdash; kept available, but no longer the default, once
+the full-corpus decision required <em>exact</em> coverage (every one of the 506 archives visited exactly
+once per epoch, not a resampled approximation) &mdash; which is ultimately why <code>portal_zip</code>
+exists as a separate, purpose-built path rather than <code>gastronet.py</code> simply growing a
+<code>resampled=False</code> flag: WebDataset&rsquo;s shard model doesn&rsquo;t map cleanly onto "stream a
+raw zip archive with resumable, checkpoint-exact progress," which is a much stronger guarantee than
+WebDataset&rsquo;s own sharding primitives are built to provide.</p>
+<hr class="sep">
+
+<h3 id="trainingdata">4.6 Training data: coverage, corruption, duplicates, distribution</h3>
+<p>Pulled directly from the live artifacts on disk just now (not estimated, not re-derived from memory):
+<code>$HOME/vlf_zeiss_fullstream/portal_manifest.json</code> (the actual frozen manifest both final runs
+trained against) and <code>$HOME/vlf_zeiss_fullstream/foundation_model/CARD.json</code>.</p>
+
+<h4>Archive coverage: 506 / 506 (100%)</h4>
+<p><code>index_manifest()</code> (&sect;4.1) hard-fails with
+<code>RuntimeError('Expected {expected} distinct portal archives')</code> if the portal doesn&rsquo;t report
+exactly 506 distinct archives, and separately raises if any individual archive can&rsquo;t be opened or
+listed at index time &mdash; there is no silent partial-coverage mode built in. Read directly from the
+manifest on disk:</p>
+<table>
+<thead><tr><th>Quantity</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Archives in manifest</td><td class="kv">506 / 506</td></tr>
+<tr><td>Manifest fingerprint (SHA-256 of the sorted archive list)</td><td class="kv" style="word-break:break-all">2b2f76f004008e0b5ecf8e38244e9cb9050bfbb1f2eb9756b99491eba33e5b72</td></tr>
+<tr><td>Total images across all archives</td><td class="kv">4,823,974</td></tr>
+<tr><td>Per-archive member count &mdash; min</td><td class="kv">2,256</td></tr>
+<tr><td>Per-archive member count &mdash; max</td><td class="kv">13,287</td></tr>
+<tr><td>Per-archive member count &mdash; mean</td><td class="kv">9,533.5</td></tr>
+<tr><td>Per-archive member count &mdash; median</td><td class="kv">9,914.5</td></tr>
+</tbody>
+</table>
+<p class="small">The fingerprint matches <code>manifest_fingerprint</code> in <code>CARD.json</code>
+character-for-character &mdash; confirming both promoted-checkpoint provenance and the manifest file on disk
+describe the same 506-archive corpus. This is also the exact 4,823,974 figure behind &sect;3.1&rsquo;s
+"images/epoch" number &mdash; not a rounded estimate.</p>
+
+<h4>Corrupt / unusable images: replaced, not dropped &mdash; and a discrepancy worth flagging honestly</h4>
+<p>As detailed in &sect;2 and &sect;4.1, <code>PortalStream.decode()</code> never drops a bad sample: a
+truncated file PIL still can&rsquo;t parse even with <code>ImageFile.LOAD_TRUNCATED_IMAGES = True</code>, or
+a manifest-listed member the archive no longer actually contains (<code>KeyError</code> on extraction),
+both become a deterministic <code>Image.new('RGB', (224, 224))</code> blank rather than a skipped sample.
+This is a direct consequence of the exact-checkpoint-resume invariant: <code>self.sizes</code> and
+<code>self.cursor</code> are computed once from the manifest&rsquo;s per-archive member counts and never
+change afterward, so dropping a bad sample would shift every later batch boundary and break resume.
+<code>attempts</code>/<code>failures</code> are informational telemetry only (never a gate, since the
+bounded-failure-rate gate from the second design iteration was removed in
+<span class="commit">26c315e</span>), persisted across checkpoint resumes.</p>
+<p>The DINO/ImageNet winning run&rsquo;s promotion record (<code>CARD.json</code>) states
+<strong>decode_failures = 0 across 13,383,770 decode attempts</strong> &mdash; a genuinely clean sweep of
+whatever the counter captured. But <code>3 epochs &times; 4,823,974 images/epoch = 14,471,922</code>
+theoretical decode attempts over a full run, and 13,383,770 is only about <strong>92.5%</strong> of that.
+I am flagging this discrepancy rather than hand-waving past it. The most plausible explanation, given how
+the counters work (<code>PortalStream</code>&rsquo;s docstring, &sect;4.1: the checkpointed
+<code>_committed</code> snapshot only advances inside <code>commit()</code>, itself only called after a
+successful optimizer step), is that the recorded figure reflects the last <em>committed</em> checkpoint
+state at promotion time, which can trail the true final in-memory count by up to one commit interval &mdash;
+but I could not verify that specific mechanism as the actual cause from the artifacts available (the
+resume/periodic checkpoints that would show the exact commit history are already deleted by
+<span class="commit">e7f9df3</span>&rsquo;s post-<code>DONE</code> cleanup, &sect;2/WS4). Presenting both
+numbers and the gap between them, not asserting a cause I can&rsquo;t back with evidence.</p>
+<p>I could not find an equivalent decode_failures/attempts figure recorded for the LeJEPA/ImageNet run
+specifically &mdash; <code>CARD.json</code>&rsquo;s <code>lejepa_imagenet_post</code> block has no such
+field, and LeJEPA&rsquo;s own <code>last.ckpt</code> (which would have carried the live counters) no longer
+exists on disk for the same reason. Not assuming symmetry with DINO&rsquo;s number here.</p>
+
+<h4>Duplicates: not deduplicated on the training side &mdash; a real scope decision, not an oversight</h4>
+<p>Worth being explicit about this rather than letting it go unmentioned: <code>vlfz/data/portal.py</code>
+has <strong>no</strong> perceptual-hash or any other deduplication logic anywhere in the fullstream path.
+It streams every manifest-listed member exactly as the portal returns it, near-duplicate consecutive frames
+from the same endoscopy procedure included. This is a genuinely different policy from the HyperKvasir
+<em>eval</em> side: <code>vlfz/data/hyperkvasir.py::global_split()</code> runs a 6-bit perceptual-hash
+cross-split dedup (commit <span class="commit">504e658</span>, &ldquo;config: enable hkv phash cross-split
+dedup&rdquo;) specifically to stop near-duplicate procedure frames from leaking across the
+reference/cal/query splits used for zero-shot k-NN evaluation, since HyperKvasir&rsquo;s CSV carries no
+patient ID to split on more directly. That mechanism was never built for the GastroNet-5M training stream
+&mdash; the curated-ingest path that preceded fullstream (<code>portal_to_wds.py</code>) did have a phash
+dedup step, but fullstream deliberately replaced that whole ingest-and-curate design with a raw pass-through
+stream (&sect;1.3), and dedup did not carry over into it. This is a real, acknowledged limitation of the
+training corpus as actually used, not something to gloss over.</p>
+
+<h4>Distribution / class balance: no formal EDA was ever run</h4>
+<p>GastroNet-5M is unlabeled &mdash; that is the entire point of it as an SSL pretraining pool, so there is
+no per-image class or procedure-type breakdown to report from the data itself. <code>docs/PLAN.md</code>
+records the only characterization that exists, and it is a documented upstream fact, not something measured
+in this project:</p>
+<div class="codehdr">docs/PLAN.md:104-107</div>
+<pre><code>- **GastroNet-5M**: ~4.82M unlabeled PNGs in &le;10k-image zip shards; gated via
+  `cortex.thetavision.nl` (not HuggingFace). SSL pretraining corpus only. Skewed
+  toward **upper GI** (gastroscopy / Barrett's) -- a known sub-domain gap vs
+  REAL-Colon's colonoscopy; noted as an interpretation caveat, not blocking.</code></pre>
+<p><code>docs/PLAN.md</code>&rsquo;s Phase&nbsp;7 / "GastroNet-5M EDA" material (&sect;H of the
+2026-09-16 addendum, &sect;1.3 above) describes a planned EDA pass &mdash; corrupt %, phash dup-cluster %,
+image-dimension and RGB/grayscale histograms, via the already-written but never-run
+<code>pipeline/dq/checks.py</code> &mdash; explicitly gated on the full corpus being locally ingested first.
+Once the pipeline pivoted to direct portal streaming instead of a locally-staged curated tier, that
+precondition never materialized in the form the EDA plan assumed, and the EDA pass itself was never executed.
+So: no measured distribution of image dimensions, color mode, or anatomical-site breakdown exists for this
+corpus beyond the single documented upper-GI skew above. If this is ever done, <code>pipeline/dq/checks.py</code>
+is where it would run, adapted to read directly from the portal stream rather than a local WebDataset tier.</p>
+<hr class="sep">
+
+<h2 id="pipeline">5. Training pipeline: how the full run was actually launched</h2>
+<p>End to end, in the order things actually happen when <code>lrz/submit_fullstream.sh</code> is run.</p>
+
+<h3>5.1 <code>lrz/submit_fullstream.sh</code></h3>
+<div class="codehdr">lrz/submit_fullstream.sh</div><pre><code>#!/bin/bash
+set -euo pipefail
+cd &quot;$(dirname &quot;${BASH_SOURCE[0]}&quot;)/..&quot;
+mkdir -p lrz/logs
+sbatch --parsable lrz/sbatch_fullstream.sbatch</code></pre>
+<p>Five lines. Its only job is <code>sbatch --parsable lrz/sbatch_fullstream.sbatch</code> from the repo
+root with the logs directory guaranteed to exist &mdash; every subsequent resubmission in &sect;3.2&rsquo;s
+14-job history is <code>sbatch</code> calling itself, not this script being re-invoked by hand (except where
+&sect;3.4.4 required a manual one).</p>
+
+<h3>5.2 <code>lrz/fullstream_env.sh</code></h3>
+<div class="codehdr">lrz/fullstream_env.sh</div><pre><code>#!/bin/bash
+# Separate real home directory: never follow the historical runs symlink.
+export OUT_ROOT=&quot;$HOME/vlf_zeiss_fullstream&quot;
+export STREAM_OBJECTIVES=&quot;${STREAM_OBJECTIVES:-dino}&quot;
+# Avoid W&amp;B stale-run collisions while remaining stable across resubmissions.
+export WANDB_RUN_NAMESPACE=&quot;${WANDB_RUN_NAMESPACE:-fullstream_optimized_v2}&quot;
+if [ &quot;$STREAM_OBJECTIVES&quot; = lejepa ]; then
+  export PORTAL_CACHE=&quot;$OUT_ROOT/zip_cache_lejepa&quot;
+else
+  export PORTAL_CACHE=&quot;$OUT_ROOT/zip_cache&quot;
+fi
+export HF_HOME=&quot;$OUT_ROOT/model_cache&quot;
+export XDG_CACHE_HOME=&quot;$OUT_ROOT/cache_runtime&quot;
+export TORCH_HOME=&quot;$OUT_ROOT/model_cache/torch&quot;
+export UV_CACHE_DIR=&quot;$OUT_ROOT/uv_cache&quot;
+export WANDB_DIR=&quot;$OUT_ROOT/wandb&quot;
+export WANDB_CACHE_DIR=&quot;$WANDB_DIR/cache&quot;
+export GASTRONET_ROOT=&quot;$OUT_ROOT/unused_local_corpus&quot;
+export GASTRONET_SOURCE=portal_zip
+export INIT=imagenet CORPUS=gastronet STAGE=full SSL_EPOCHS=3 BATCH_SIZE=128
+export BASE_LR=1e-4 MIN_LR=1e-6 LLRD=0.75 GRAD_CKPT=false
+# Measured 2026-09-22, on cached archives + live portal range requests:
+#   portal download   ~100 MiB/s on ONE connection (150 MiB/s at 4) -- NOT the
+#                     bottleneck; production was only pulling ~20 MB/s.
+#   decode            18.2 ms/image
+#   +augmentation     47.2 ms/image lejepa, 85.4 ms/image dino  &lt;-- the cost
+# So throughput is CPU augmentation-bound and scales with worker count. At the
+# old 4 workers lejepa managed 0.39 it/s (~60% of the 0.66 theoretical, the
+# rest being IPC/batching/GPU). 12 workers fits the 16 allocated CPUs, leaving
+# 4 for the main process, the download thread and GPU feed, and keeps archive
+# processing (~60s) comfortably slower than the ~38s prefetch download so the
+# single prefetch thread stays ahead.
+export PORTAL_TRANSFORM_WORKERS=12
+source lrz/job_env.sh</code></pre>
+<p>The environment every fullstream job actually runs under. A few decisions worth calling out beyond what
+the inline comments already say: <code>PORTAL_CACHE</code> is split by objective
+(<code>zip_cache</code> vs <code>zip_cache_lejepa</code>) so DINO and LeJEPA running as separate SLURM
+allocations never fight over the same two-archive disk budget or race on cache eviction.
+<code>WANDB_RUN_NAMESPACE=fullstream_optimized_v2</code> is the mechanism discussed in &sect;3.4.5 &mdash;
+baked in from the start specifically to survive resubmission-triggered run-id collisions.
+<code>PORTAL_TRANSFORM_WORKERS=12</code> is not a round-number guess: the comment records an actual
+measurement session (2026-09-22) that isolated the real bottleneck &mdash; portal download itself measured
+~100&nbsp;MiB/s on one connection (not the bottleneck; production was only pulling ~20&nbsp;MB/s), decode
+measured 18.2&nbsp;ms/image, and <em>augmentation</em> measured 47.2&nbsp;ms/image (LeJEPA) /
+85.2&nbsp;ms/image (DINO) &mdash; i.e. the pipeline is CPU-augmentation-bound, not I/O- or GPU-bound, and
+throughput scales with worker count up to the CPU budget. 12 workers was chosen to fit 16 allocated CPUs
+while leaving headroom for the main process, the download thread, and GPU feed, and to keep per-archive
+processing (~60s) comfortably slower than the ~38s prefetch download so the single prefetch thread never
+falls behind.</p>
+
+<h3>5.3 <code>lrz/sbatch_fullstream.sbatch</code></h3>
+<div class="codehdr">lrz/sbatch_fullstream.sbatch</div><pre><code>#!/bin/bash
+#SBATCH --job-name=vlfz_fullstream
+#SBATCH --partition=lrz-hgx-h100-94x4,lrz-hgx-a100-80x4
+#SBATCH --qos=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=110G
+#SBATCH --time=48:00:00
+#SBATCH --signal=B:USR1@300
+#SBATCH --no-requeue
+#SBATCH --output=lrz/logs/fullstream_%j.out
+#SBATCH --error=lrz/logs/fullstream_%j.err
+set -euo pipefail
+cd &quot;$SLURM_SUBMIT_DIR&quot;
+source lrz/fullstream_env.sh
+child=&#x27;&#x27;
+trap &#x27;if [ -n &quot;$child&quot; ]; then kill -USR1 &quot;$child&quot;; fi&#x27; USR1
+python -m vlfz.ssl.fullstream &amp;
+child=$!
+set +e
+wait &quot;$child&quot;
+rc=$?
+if kill -0 &quot;$child&quot; 2&gt;/dev/null; then
+  wait &quot;$child&quot;
+  rc=$?
+fi
+set -e
+if [ &quot;$rc&quot; = 75 ] &amp;&amp; [ &quot;${STREAM_RESUMES:-0}&quot; -lt 100 ]; then
+  export STREAM_RESUMES=$(( ${STREAM_RESUMES:-0} + 1 ))
+  sbatch &quot;$SLURM_SUBMIT_DIR/lrz/sbatch_fullstream.sbatch&quot;
+elif [ &quot;$rc&quot; != 0 ]; then
+  echo &quot;Stopped with rc=$rc; inspect logs before manual retry.&quot;
+  exit &quot;$rc&quot;
+fi</code></pre>
+<p>The self-resubmission mechanism in full. <code>#SBATCH --signal=B:USR1@300</code> asks SLURM to deliver
+SIGUSR1 5 minutes before the hard wall-time kill; the trap forwards it to the Python child
+(<code>kill -USR1 "$child"</code>), which <code>PortalWalltime</code> (&sect;4.3) turns into a synchronous
+checkpoint save and <code>SystemExit(75)</code>. The <code>wait "$child"; ... if kill -0 "$child"; then
+wait "$child"; fi</code> double-wait handles a real shell race: a signal delivered to the shell can interrupt
+the first <code>wait</code> before the child has actually exited, so it re-waits if the child is still
+alive. <code>rc = 75</code> triggers exactly one more <code>sbatch</code> of this same script, capped at
+<code>STREAM_RESUMES &lt; 100</code> as a sanity ceiling against an infinite resubmit loop; any other
+non-zero exit code is treated as a real failure and left for inspection rather than auto-retried &mdash;
+this is the distinction discussed at length in &sect;2 (<span class="commit">c0be0e6</span>): a
+checkpointed, intentional wall-time exit resubmits, everything else does not.
+<code>--time=48:00:00</code> is the value <span class="commit">c26aefe</span> raised from 24h, specifically
+because queue wait (not resubmit overhead) dominated total time-to-completion &mdash; getting one allocation
+pair admitted took roughly 2 days against ~550 cluster-wide pending jobs on these partitions at the time, so
+halving the number of 24h-boundary re-entries into that queue was the actual lever, not making each
+individual run faster.</p>
+
+<h3>5.4 Foundation-model selection rule and promotion</h3>
+<p>The rule, as stated in <code>CARD.json</code> (written verbatim by the promotion step, quoted here
+rather than paraphrased): <em>primary criterion is mean post-SSL balanced-accuracy across the 4 HyperKvasir
+classification tasks plus Dice on <code>hkv_seg</code>; ECE/NLL and effective-rank are a gate, not the
+ranking &mdash; any regression vs. the shared pre-SSL ImageNet baseline on the primary metric, or an
+effective-rank collapse, disqualifies a candidate regardless of any other metric looking good.</em> This was
+decided deliberately in favor of discriminative quality over calibration for a <em>foundation</em> checkpoint
+specifically because downstream fine-tuning recalibrates anyway &mdash; ECE/NLL matter for the zero-shot
+comparison this benchmark is actually about, but not for judging what&rsquo;s worth carrying forward as a
+base for further training.</p>
+<p>Promotion itself (triggered manually once both settings&rsquo; <code>evaluation_*.json</code> receipts
+existed) copies the winning setting&rsquo;s <code>ema_backbone.pt</code> to a separate
+<code>$OUT_ROOT/foundation_model/ema_backbone.pt</code>, writes the <code>CARD.json</code> provenance card
+recording <strong>both</strong> settings&rsquo; full metrics (so the decision stays auditable, not just the
+winner&rsquo;s numbers in isolation), and logs the same file as a versioned W&amp;B Artifact
+(<code>dino-imagenet-s506-raw-e3</code>) via the block at the end of <code>fullstream.py</code>
+(&sect;4.2) &mdash; specifically so the one file every future downstream fine-tuning run depends on does not
+live only on LRZ storage, whose reliability this project had already been burned by twice (&sect;2/WS4,
+&sect;3.4.1&ndash;3.4.3).</p>
+<hr class="sep">
+
+<h2 id="results">6. Final results &amp; foundation-model promotion</h2>
+<p>Both settings: 4.9M images (all 506 portal archives, raw, streamed), 113,064 optimizer steps (3 full
+passes over the manifest), ImageNet ViT-B/16 init only, batch size 128, bf16 mixed precision, AdamW +
+cosine LR schedule (base 1e-4, min 1e-6), layer-wise LR decay 0.75, grad clip 3.0, single-GPU H100&nbsp;94GB
+/ A100&nbsp;80GB, self-resubmitting across a 48h wall-time ceiling. &Delta; = post-SSL &minus; pre-SSL
+(shared ImageNet zero-shot baseline).</p>
+
+<h3>6.1 DINO / ImageNet &mdash; passed the gate cleanly</h3>
+<p>Effective rank stable/climbing across all 3 epochs: 14.0 &rarr; 14.1 &rarr; 14.3. Zero regressions on any
+metric, any task.</p>
+<table><thead><tr><th>Task</th><th>&Delta;ECE (ew)</th><th>&Delta;ECE&middot;T</th><th>&Delta;NLL</th><th>&Delta;acc</th><th>&Delta;bal-acc</th><th>&Delta;AUROC</th></tr></thead><tbody><tr><td>findings (20-way)</td><td><span class="neg">-0.0255</span></td><td><span class="neg">-0.0250</span></td><td><span class="neg">-0.0520</span></td><td><span class="pos">+0.0160</span></td><td><span class="pos">+0.0290</span></td><td><span class="pos">+0.0100</span></td></tr><tr><td>category (4-way)</td><td><span class="neg">-0.0117</span></td><td><span class="neg">-0.0024</span></td><td><span class="neg">-0.0090</span></td><td><span class="pos">+0.0040</span></td><td><span class="pos">+0.0010</span></td><td><span class="pos">+0.0020</span></td></tr><tr><td>pathology (2-way)</td><td><span class="neg">-0.0039</span></td><td><span class="pos">+0.0113</span></td><td><span class="pos">+0.0070</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0010</span></td></tr><tr><td>tract (2-way)</td><td><span class="">0.0000</span></td><td><span class="neg">-0.0038</span></td><td><span class="neg">-0.0100</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0010</span></td><td><span class="">0.0000</span></td></tr></tbody></table>
+<p>Segmentation: &Delta;ECE(ew) +.0012, &Delta;NLL &minus;.039, <strong>&Delta;Dice +.079</strong>
+(0.667 &rarr; 0.745).</p>
+
+<h3>6.2 LeJEPA / ImageNet &mdash; failed the gate</h3>
+<p>Effective rank climbing but starting lower and staying lower: 12.1 &rarr; 13.0 &rarr; 13.2. Regressed on
+accuracy and balanced-accuracy on every single classification task, and on segmentation Dice.</p>
+<table><thead><tr><th>Task</th><th>&Delta;ECE (ew)</th><th>&Delta;ECE&middot;T</th><th>&Delta;NLL</th><th>&Delta;acc</th><th>&Delta;bal-acc</th><th>&Delta;AUROC</th></tr></thead><tbody><tr><td>findings (20-way)</td><td><span class="neg">-0.0208</span></td><td><span class="neg">-0.0378</span></td><td><span class="pos">+0.1690</span></td><td><span class="neg">-0.0520</span></td><td><span class="neg">-0.0370</span></td><td><span class="neg">-0.0260</span></td></tr><tr><td>category (4-way)</td><td><span class="neg">-0.0050</span></td><td><span class="neg">-0.0141</span></td><td><span class="pos">+0.0910</span></td><td><span class="neg">-0.0340</span></td><td><span class="neg">-0.0350</span></td><td><span class="neg">-0.0080</span></td></tr><tr><td>pathology (2-way)</td><td><span class="neg">-0.0022</span></td><td><span class="neg">-0.0139</span></td><td><span class="pos">+0.0840</span></td><td><span class="neg">-0.0300</span></td><td><span class="neg">-0.0520</span></td><td><span class="neg">-0.0180</span></td></tr><tr><td>tract (2-way)</td><td><span class="pos">+0.0033</span></td><td><span class="neg">-0.0017</span></td><td><span class="pos">+0.0110</span></td><td><span class="neg">-0.0040</span></td><td><span class="neg">-0.0060</span></td><td><span class="neg">-0.0010</span></td></tr></tbody></table>
+<p>Segmentation: &Delta;ECE(ew) +.0048, &Delta;NLL +.063, <strong>&Delta;Dice &minus;.079</strong>.</p>
+<p class="small">Same qualitative accuracy/calibration trade-off as the earlier curated-subset study
+(&sect;1.2), much milder in magnitude here (3&ndash;5pt regression vs. 19&ndash;62pt there) &mdash; consistent
+with the subset-era result being confounded by LeJEPA&rsquo;s ~4-epoch overrun
+(<span class="commit">f898184</span>, &sect;2) as well as by training on only 12% of the corpus, not purely
+an objective-level failure. It still fails the gate on the full, correctly-bounded run, though by a much
+smaller margin.</p>
+
+<h3>6.3 Decision and promoted artifact</h3>
+<p>DINO/ImageNet passes the selection gate (&sect;5.4) on every component &mdash; no regression anywhere.
+LeJEPA/ImageNet fails it on both mean balanced-accuracy and segmentation Dice. <strong>DINO is the
+winner</strong>, promoted as the project&rsquo;s foundation model:</p>
+<ul>
+<li>Checkpoint: <code>$HOME/vlf_zeiss_fullstream/foundation_model/ema_backbone.pt</code>
+(ViT-B/16 trunk <code>state_dict</code>, from <code>ssl/dino_imagenet_gastronet_full__s506_raw_e3/ema_backbone.pt</code>, gstep 113,064).</li>
+<li>Provenance card: <code>$HOME/vlf_zeiss_fullstream/foundation_model/CARD.json</code> &mdash; records both
+settings&rsquo; full comparison numbers, the selection rule verbatim, git SHA <span class="commit">3b7b3a4</span>,
+date 2026-09-29, SLURM job <span class="commit">5812722</span>.</li>
+<li>W&amp;B Artifact: <code>dino-imagenet-s506-raw-e3</code>, project
+<code>models-ludwig-maximilian-university-of-munich/vlf-zeiss</code> &mdash; the durability guarantee
+independent of LRZ storage (&sect;5.4).</li>
+</ul>
+<p>Downstream fine-tuning on other tasks is explicitly out of scope for this artifact &mdash; selection and
+promotion is where this phase of the project stops.</p>
+
+<footer>
+Internal build log &mdash; VLF_Zeiss. Not published, not linked from the public site. Generated 2026-09-30
+against repo commit <span class="commit">3b7b3a4</span>.
+</footer>
+
+</div>
+</body>
+</html>
