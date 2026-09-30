@@ -1794,6 +1794,31 @@ specifically &mdash; <code>CARD.json</code>&rsquo;s <code>lejepa_imagenet_post</
 field, and LeJEPA&rsquo;s own <code>last.ckpt</code> (which would have carried the live counters) no longer
 exists on disk for the same reason. Not assuming symmetry with DINO&rsquo;s number here.</p>
 
+<h4>Would blank-filling instead of dropping have worsened SSL training?</h4>
+<p>Two separate questions. <strong>In practice, here: no measurable effect</strong>, because the observed rate
+was ~0. With 0 failures logged on the DINO run out of 13.4M attempts, essentially no batch ever actually
+contained a blank sample &mdash; so this design choice (blank-fill rather than drop, to preserve the
+exact-checkpoint-resume invariant, &sect;2/WS5) never actually got stress-tested by real corrupted data on
+this corpus. It was a reasonable bet given the expected corruption rate, and the bet paid off, but that is
+different from having been validated under load.</p>
+<p><strong>In principle, if the rate were higher, the failure mode would differ by objective:</strong></p>
+<ul>
+<li><strong>DINO</strong> uses multi-crop self-distillation &mdash; two augmented &ldquo;views&rdquo; of a blank
+image are both just uniform black, giving a trivial, information-free positive pair. Not actively harmful to
+the loss on its own (there is no gradient signal pulling the model toward a wrong answer), but a wasted step;
+at a high-enough rate the model could start treating &ldquo;solid black&rdquo; as a valid, high-confidence
+cluster of its own &mdash; a subtle shortcut the objective has no mechanism to penalize.</li>
+<li><strong>LeJEPA is more exposed.</strong> Its SIGReg term (&sect;4.4) computes <em>batch-level</em>
+isotropy/variance statistics over the whole embedding batch. A batch containing one or more degenerate
+(near-identical) blank-image embeddings skews those batch statistics directly &mdash; it is an input to the
+regularizer&rsquo;s target, not just one training example diluted into an average loss. At a high-enough
+contamination rate this could measurably distort what SIGReg is pushing the representation toward, which is a
+qualitatively different (and worse) failure mode than DINO&rsquo;s &ldquo;wasted step.&rdquo;</li>
+</ul>
+<p class="small">Neither of these was ever exercised here &mdash; the corruption rate was too low to say
+anything empirical about it beyond &ldquo;it did not happen.&rdquo; This is written down as a known,
+unvalidated risk in the design, not as a demonstrated problem.</p>
+
 <h4>Duplicates: not deduplicated on the training side &mdash; a real scope decision, not an oversight</h4>
 <p>Worth being explicit about this rather than letting it go unmentioned: <code>vlfz/data/portal.py</code>
 has <strong>no</strong> perceptual-hash or any other deduplication logic anywhere in the fullstream path.
