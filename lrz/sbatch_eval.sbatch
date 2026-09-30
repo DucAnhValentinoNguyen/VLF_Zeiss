@@ -22,9 +22,11 @@ DATASET="${DATASET:-hyperkvasir}"
 INIT="${INIT:-siglip2}"; STAGE="${STAGE:-pre}"; OBJ="${OBJ:-lejepa}"
 CORPUS="${CORPUS:-gastronet}"
 PROTOCOLS="${PROTOCOLS:-knn}"
+RUN_TAG="${RUN_TAG:-}"
 
 ARGS=(--dataset "$DATASET" --init "$INIT" --stage "$STAGE" --objective "$OBJ"
       --corpus "$CORPUS" --task all --protocols "$PROTOCOLS")
+[ -n "$RUN_TAG" ] && ARGS+=(--run-tag "$RUN_TAG")
 
 echo "[$(date)] eval ${DATASET}/${INIT}/${STAGE}/${OBJ}/${CORPUS}  job=$SLURM_JOB_ID"
 srun python -m vlfz.eval.run_eval "${ARGS[@]}"

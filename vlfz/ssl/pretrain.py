@@ -24,15 +24,43 @@ import lightning.pytorch as pl
 import torch
 import torch.nn as nn
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.plugins.io import TorchCheckpointIO
 
 from ..cfg import ensure_dirs, git_sha, load_cfg, provenance, set_seed
 from ..models.ema import EMA, cosine_momentum
 from ..models.heads import DINOHead, Predictor, Projector
 from ..models.vit_backbone import build_vit_b16
+from ..run_paths import ssl_dir
 from .dino_lib import cosine_lr, dino_loss, teacher_temp_at, update_center
 from .lejepa_lib import effective_rank, lejepa_loss
 
 _IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
+
+
+class AtomicCheckpointIO(TorchCheckpointIO):
+    def save_checkpoint(self, checkpoint, path, storage_options=None):
+        tmp = str(path) + '.tmp'
+        super().save_checkpoint(checkpoint, tmp, storage_options)
+        os.replace(tmp, path)
+
+
+class PortalWalltime(pl.Callback):
+    def on_fit_start(self, trainer, pl_module):
+        import signal
+        self.requested = False
+        self.previous = signal.signal(signal.SIGUSR1, self.request)
+
+    def request(self, *_):
+        self.requested = True
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if self.requested:
+            trainer.save_checkpoint(os.path.join(pl_module.out_dir, 'last.ckpt'))
+            raise SystemExit(75)
+
+    def on_fit_end(self, trainer, pl_module):
+        import signal
+        signal.signal(signal.SIGUSR1, self.previous)
 
 
 # ---------------------------------------------------------------- data
@@ -79,6 +107,29 @@ def _make_loader(cfg, args, transform, collate, *, bs, nw, dev):
     from ..data.gastronet import resolve_source, webdataset_loader, webdataset_shards
 
     source = resolve_source(cfg, args.source)
+    if source == 'portal_zip':
+        from ..data.portal import PortalClient, ZipCache, PortalStream, index_manifest
+        client = PortalClient(str(cfg.ssl.portal_json))
+        cache = ZipCache(str(cfg.ssl.portal_cache))
+        manifest_path = os.path.join(os.path.expanduser(str(cfg.paths.out_root)), 'portal_manifest.json')
+        manifest = index_manifest(client, cache, manifest_path)
+        stream = PortalStream(client, cache, manifest, transform, collate, bs,
+                              int(cfg.seed), int(cfg.ssl.full.epochs),
+                              transform_workers=int(getattr(cfg.ssl, 'portal_transform_workers', 0)))
+        if nw and stream.transform_workers:
+            raise ValueError('Use portal_num_workers=0 with parallel transform workers')
+        loader_kwargs = dict(batch_size=None, num_workers=nw,
+                             pin_memory=(dev == 'cuda'),
+                             generator=torch.Generator().manual_seed(int(cfg.seed)))
+        if nw:
+            # Exactly one worker is supported: it prepares the next batch while
+            # the GPU trains. A fresh worker each epoch inherits the committed
+            # parent cursor; persistent workers would retain a stale cursor.
+            if nw != 1:
+                raise ValueError('portal_zip requires num_workers 0 or 1')
+            loader_kwargs.update(prefetch_factor=1, persistent_workers=False)
+        dl = torch.utils.data.DataLoader(stream, **loader_kwargs)
+        return dl, len(stream.sizes)
     if source == "local_zip":
         from ..data.gastronet import GastroNetDataset
 
@@ -203,8 +254,9 @@ def _hparams(cfg, args, **rt) -> dict:
 
 def _wandb_logger(cfg, args, out_dir):
     """A WandbLogger when W&B is configured (a WANDB_API_KEY in the env, or
-    cfg.wandb.enabled), else None. The run id is derived from out_dir so a SLURM
-    resubmit resumes the SAME W&B run instead of starting a new one."""
+    cfg.wandb.enabled), else None. The run id is derived from out_dir so a
+    SLURM resubmit resumes the SAME W&B run. A namespace can be supplied when
+    an old run id is stuck active on the W&B server after a killed process."""
     wcfg = getattr(cfg, "wandb", None)
     on = bool(os.environ.get("WANDB_API_KEY")) or bool(getattr(wcfg, "enabled", False))
     if not on or os.environ.get("WANDB_MODE") == "disabled":
@@ -217,10 +269,12 @@ def _wandb_logger(cfg, args, out_dir):
 
         ent = os.environ.get("WANDB_ENTITY") or str(getattr(wcfg, "entity", "")) or None
         proj = os.environ.get("WANDB_PROJECT") or str(getattr(wcfg, "project", "vlf-zeiss"))
+        namespace = os.environ.get("WANDB_RUN_NAMESPACE", "")
+        run_key = out_dir + ("\n" + namespace if namespace else "")
         return WandbLogger(
             project=proj, entity=ent,
             name=f"{args.objective}_{args.init}_{args.corpus}_{args.stage}",
-            id=hashlib.md5(out_dir.encode()).hexdigest()[:16], resume="allow",
+            id=hashlib.md5(run_key.encode()).hexdigest()[:16], resume="allow",
             save_dir=os.environ.get("WANDB_DIR", out_dir),
             tags=[args.objective, args.init, args.corpus, args.stage],
         )
@@ -259,7 +313,7 @@ class SSLModule(pl.LightningModule):
         # backward is the prime suspect for an intermittent CPU hang inside
         # the optimizer step right after (reproduced repeatedly; foreach=False
         # alone did not fix it -- see docs/PLAN.md debugging notes).
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() and str(getattr(cfg.ssl, 'grad_checkpointing', True)).lower() in ('true', '1'):
             backbone.set_grad_checkpointing(True)
         if args.lora:
             backbone = _maybe_lora(backbone)
@@ -313,6 +367,14 @@ class SSLModule(pl.LightningModule):
 
     # -- step -----------------------------------------------------------
     def training_step(self, batch, batch_idx):
+        cursor = None
+        if isinstance(batch, dict):
+            self.log('portal/data_wait_seconds', float(batch.get('data_wait_seconds', 0)))
+            cursor = batch['cursor']
+            portal_transferred = float(batch.get('transferred_bytes', 0))
+            portal_cache_peak = float(batch.get('cache_reserved_peak', 0))
+            batch = batch['views']
+        self._probe = batch[0][:16].detach().cpu()
         cfg, opt = self.cfg, self.optimizers()
         cur_lr = self._set_lr(opt)
         gstep = self.global_step
@@ -342,6 +404,8 @@ class SSLModule(pl.LightningModule):
             parts = {"dino": float(loss.detach())}
 
         if not torch.isfinite(loss):
+            if cursor is not None:
+                raise RuntimeError('Non-finite portal training loss; stopping')
             print(f"  [skip] non-finite loss @ step {gstep}")
             opt.zero_grad(set_to_none=True)
             return None
@@ -359,11 +423,19 @@ class SSLModule(pl.LightningModule):
         # was seen (docs/PLAN.md) and never reproduced on GPU; foreach=False
         # (configure_optimizers) + single-thread (train()) are the other
         # CPU-only guards.
-        if torch.cuda.is_available():
+        if torch.cuda.is_available() or cursor is not None:
             opt.step()
         else:
             opt.optimizer.step()
         opt.zero_grad(set_to_none=True)
+
+        if self.global_step - self._rate_step >= 100:
+            elapsed = time.monotonic() - self._rate_time
+            rate = (self.global_step - self._rate_step) / max(elapsed, 1e-6)
+            print(f'[throughput] step={self.global_step} steps_per_second={rate:.4f} '
+                  f'window_seconds={elapsed:.1f}', flush=True)
+            self.log('perf/window_steps_per_second', rate)
+            self._rate_step, self._rate_time = self.global_step, time.monotonic()
 
         if self.ema_bb is not None:
             self.ema_bb.update(self.backbone)
@@ -377,6 +449,12 @@ class SSLModule(pl.LightningModule):
         for k, v in parts.items():
             self.log(f"loss/{k}", v, on_step=True, on_epoch=False)
         self.log("lr", cur_lr, on_step=True, on_epoch=False)
+        if cursor is not None:
+            self.trainer.datamodule._dl.dataset.commit(cursor)
+            # These counters come from the worker process when prefetching is
+            # enabled; the parent's client/cache objects are separate copies.
+            self.log('portal/transferred_bytes', portal_transferred)
+            self.log('portal/cache_reserved_peak', portal_cache_peak)
 
         if (gstep + 1) % int(cfg.ssl.ckpt_every_steps) == 0:
             self.save_eval_backbone()
@@ -403,8 +481,7 @@ class SSLModule(pl.LightningModule):
         try:
             self.backbone.eval()
             with torch.no_grad():
-                probe = next(iter(self.trainer.train_dataloader))
-                v = probe[0][:64].to(self.device)
+                v = self._probe.to(self.device)
                 er = effective_rank(self.backbone.feature(v))
             print(f"epoch {self.current_epoch + 1} done  eff_rank {er:.1f}  "
                   f"({dt / 60:.1f} min, {ips:.2f} it/s)")
@@ -416,17 +493,73 @@ class SSLModule(pl.LightningModule):
         self.save_eval_backbone()
 
     # -- the one artefact downstream eval reads; format unchanged pre-Lightning
+    def on_save_checkpoint(self, checkpoint):
+        import random
+        import numpy as np
+        ds = getattr(self.trainer.datamodule._dl, 'dataset', None)
+        if hasattr(ds, 'state_dict'):
+            checkpoint['portal_cursor'] = ds.state_dict()
+            checkpoint['portal_rng'] = (random.getstate(), np.random.get_state(), torch.get_rng_state(),
+                                       torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [])
+
+    def on_load_checkpoint(self, checkpoint):
+        if 'portal_cursor' in checkpoint:
+            self.trainer.datamodule._dl.dataset.load_state_dict(checkpoint['portal_cursor'])
+        self._portal_restore = checkpoint
+
+    def on_train_start(self):
+        self._train_started = time.monotonic()
+        self._train_start_step = self.global_step
+        self._rate_step, self._rate_time = self.global_step, time.monotonic()
+        import random
+        import numpy as np
+        checkpoint = getattr(self, '_portal_restore', {})
+        if 'portal_cursor' in checkpoint:
+            self.trainer.datamodule._dl.dataset.load_state_dict(checkpoint['portal_cursor'])
+            py, npstate, cpu, cuda = checkpoint['portal_rng']
+            random.setstate(py)
+            np.random.set_state(npstate)
+            torch.set_rng_state(cpu.cpu())
+            if cuda:
+                torch.cuda.set_rng_state_all([x.cpu() for x in cuda])
+        self._portal_restore = None
+
+    def on_train_end(self):
+        from ..data.portal import atomic_json
+        seconds = time.monotonic() - self._train_started
+        steps = self.global_step - self._train_start_step
+        atomic_json(os.path.join(self.out_dir, 'throughput.json'),
+                    {'steps': steps, 'seconds': seconds,
+                     'steps_per_second': steps / max(seconds, 1e-6),
+                     'projected_full_seconds': self.total_steps * seconds / max(steps, 1)})
+
     def save_eval_backbone(self):
+        ds = getattr(self.trainer.datamodule._dl, 'dataset', None)
+        metadata = {'run_tag': self.args.run_tag,
+                    'ssl_base_lr': float(self.cfg.ssl.base_lr),
+                    'ssl_min_lr': float(self.cfg.ssl.min_lr), 'ssl_llrd': float(self.cfg.ssl.llrd)}
+        if hasattr(ds, 'manifest') and isinstance(ds.manifest, dict):
+            metadata.update(source='portal_zip', ssl_source='portal_zip', preprocessing='raw',
+                            manifest_fingerprint=ds.manifest['fingerprint'],
+                            train_shards=len(ds.manifest['archives']),
+                            completed_epochs=ds.cursor['epoch'],
+                            images_per_epoch=sum(ds.sizes), cursor=ds.state_dict(),
+                            transferred_bytes=ds.client.transferred_bytes,
+                            cache_peak_bytes=ds.cache.peak)
+            metadata['coverage'] = ds.coverage()
         trunk = (self.teacher_net["bb"].trunk if self.teacher is not None
                  else self.ema_bb_net.trunk)
         torch.save(
             {"ema_backbone": trunk.state_dict(), "init": self.args.init,
              "objective": self.args.objective, "corpus": self.args.corpus,
-             "gstep": self.global_step,
+             "gstep": self.global_step, "run_tag": getattr(self.args, "run_tag", ""),
+             "training_metadata": metadata,
              "provenance": provenance(int(self.cfg.seed), objective=self.args.objective,
                                       init=self.args.init, corpus=self.args.corpus)},
-            os.path.join(self.out_dir, "ema_backbone.pt"),
+            os.path.join(self.out_dir, "ema_backbone.pt.tmp"),
         )
+        os.replace(os.path.join(self.out_dir, 'ema_backbone.pt.tmp'),
+                   os.path.join(self.out_dir, 'ema_backbone.pt'))
 
 
 # ---------------------------------------------------------------- train
@@ -446,6 +579,9 @@ def train(cfg, args):
     epochs = int(st.epochs)
     bs = int(args.bs or getattr(st, "batch_size", cfg.ssl.batch_size))
     nw = int(args.nw if args.nw is not None else getattr(st, "num_workers", cfg.ssl.num_workers))
+    if args.source == 'portal_zip':
+        nw = int(args.nw if args.nw is not None else
+                 getattr(cfg.ssl, 'portal_num_workers', 1))
     if args.stage == "smoke":  # keep the login-node/CI footprint tiny
         from omegaconf import OmegaConf, open_dict
 
@@ -454,10 +590,8 @@ def train(cfg, args):
             cfg.ssl.dino.n_local = min(int(cfg.ssl.dino.n_local), int(args.dino_n_local))
             cfg.ssl.dino.out_dim = min(int(cfg.ssl.dino.out_dim), int(args.dino_out_dim))
 
-    out_dir = args.out or os.path.join(
-        os.path.expanduser(str(cfg.paths.ckpts)),
-        f"{args.objective}_{args.init}_{args.corpus}_{args.stage}",
-    )
+    out_dir = args.out or ssl_dir(str(cfg.paths.ckpts), args.objective, args.init, args.corpus,
+                                  args.stage, args.run_tag)
     ensure_dirs(out_dir)
     done_flag = os.path.join(out_dir, "DONE")
     if os.path.exists(done_flag) and not args.fresh:
@@ -517,6 +651,9 @@ def train(cfg, args):
         except Exception:  # noqa: BLE001 (offline / no url)
             print("[pretrain] wandb logging enabled")
 
+    callbacks = [ckpt_cb]
+    if args.source == 'portal_zip':
+        callbacks.append(PortalWalltime())
     trainer = pl.Trainer(
         accelerator=("gpu" if dev == "cuda" else "cpu"), devices=1,
         precision=("bf16-mixed" if dev == "cuda" else 32),
@@ -527,13 +664,16 @@ def train(cfg, args):
         # max_steps=total_steps makes "3 epochs" mean 3*steps_per_epoch of training
         # regardless of how many allocations it took.
         max_epochs=-1, max_steps=(args.limit_steps or total_steps),
-        default_root_dir=out_dir, callbacks=[ckpt_cb], logger=loggers,
+        default_root_dir=out_dir, callbacks=callbacks, logger=loggers,
+        plugins=[AtomicCheckpointIO()],
         enable_progress_bar=True, log_every_n_steps=50,
         num_sanity_val_steps=0,
     )
-    trainer.fit(model, datamodule=dm, ckpt_path=resume_from)
+    trainer.fit(model, datamodule=dm, ckpt_path=resume_from, weights_only=False)
 
     if not model._limit_hit:
+        if args.source == 'portal_zip' and dm._dl.dataset.cursor['epoch'] != epochs:
+            raise RuntimeError('Training ended without three complete portal passes')
         open(done_flag, "w").write(__import__("time").strftime("%Y-%m-%d %H:%M:%S\n"))
         print(f"[pretrain] DONE -> {out_dir}/ema_backbone.pt")
         # Reclaim the resume/periodic checkpoints (~1.4 GB each) now that the run
@@ -563,9 +703,10 @@ def main():
     ap.add_argument("--corpus", choices=["gastronet", "hkv_unlabeled"],
                     default=os.environ.get("CORPUS", "gastronet"))
     ap.add_argument("--source", default=os.environ.get("GASTRONET_SOURCE"),
-                    choices=["local_zip", "local_webdataset", "s3_webdataset"],
+                    choices=["local_zip", "local_webdataset", "s3_webdataset", "portal_zip"],
                     help="gastronet read path (default: cfg.ssl.gastronet_source)")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--run-tag", default=os.environ.get("RUN_TAG", ""))
     ap.add_argument("--lora", action="store_true")
     ap.add_argument("--resume", action="store_true", default=True)
     ap.add_argument("--fresh", action="store_true")
@@ -581,9 +722,10 @@ def main():
         from ..data.gastronet import resolve_source, shard_paths, webdataset_shards
 
         src = resolve_source(cfg, args.source)
+        args.source = src
         ok = (bool(shard_paths(os.path.expanduser(str(cfg.paths.gastronet))))
               if src == "local_zip" else True)
-        if src != "local_zip":
+        if src not in ("local_zip", "portal_zip"):
             try:
                 ok = bool(webdataset_shards(cfg, src))
             except Exception as e:  # noqa: BLE001

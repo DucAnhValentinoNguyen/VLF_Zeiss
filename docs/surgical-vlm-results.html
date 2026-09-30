@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Endoscopy Calibration Study</title>
+<meta name="description" content="Does in-domain self-supervised pretraining on GastroNet-5M improve the calibration of frozen vision-foundation features on endoscopy images? Results across four pretraining settings, plus a case study in catching a silent training failure.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  :root{
+    --bg:#f5f7f8; --surface:#ffffff; --surface-2:#eef1f3;
+    --ink:#14181b; --muted:#59626c; --line:#e0e4e8; --line-strong:#c9d0d6;
+    --accent:#0d7a84; --accent-soft:#0d7a8422; --slate:#6b7a86;
+    --good:#1f9d57; --warn:#b0761b; --bad:#c0453c;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+      --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+      --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+      --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+    --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+    --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+    --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); font-size:17px; line-height:1.66;
+    font-feature-settings:"liga" 1;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding-inline:24px}
+  .prose{max-width:706px}
+  .prose p, .prose ul, .prose ol{margin:0 0 1.05rem}
+  .prose ul,.prose ol{padding-left:1.25rem}
+  .prose li{margin:.3rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  strong{font-weight:600}
+  h1,h2,h3{font-family:var(--sans); font-weight:600; line-height:1.25; text-wrap:balance; margin:0}
+  h2{font-size:1.5rem; margin:0 0 .2rem}
+  h3{font-size:1.12rem; margin:2.2rem 0 .5rem}
+  h4{font-family:var(--sans); font-size:.98rem; margin:1.4rem 0 .4rem; font-weight:600}
+  .eyebrow{font-family:var(--mono); font-size:.72rem; font-weight:500;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent)}
+  code{font-family:var(--mono); font-size:.86em; background:var(--surface-2);
+    padding:.1em .36em; border-radius:3px; border:1px solid var(--line)}
+
+  header.top{border-bottom:1px solid var(--line); background:var(--surface)}
+  .top .wrap{padding-block:34px 30px}
+  .kicker{font-family:var(--mono); font-size:.74rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px}
+  h1{font-size:2.05rem; letter-spacing:-.012em; margin-bottom:.6rem}
+  .sub{font-size:1.05rem; color:var(--muted); max-width:640px; margin:0 0 .9rem}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 10px; margin-top:20px;
+    font-family:var(--mono); font-size:.74rem}
+  .meta span{border:1px solid var(--line); border-radius:100px;
+    padding:4px 10px; color:var(--muted); background:var(--bg)}
+  .meta b{color:var(--ink); font-weight:500}
+
+  nav.toc{position:sticky; top:0; z-index:5; background:var(--bg);
+    border-bottom:1px solid var(--line)}
+  nav.toc .wrap{display:flex; flex-wrap:wrap; gap:2px 4px; padding-block:9px}
+  nav.toc a{font-family:var(--mono); font-size:.73rem; color:var(--muted);
+    text-decoration:none; padding:4px 9px; border-radius:5px; white-space:nowrap}
+  nav.toc a:hover{color:var(--ink); background:var(--surface-2)}
+
+  section.part{padding:52px 0 8px; border-top:1px solid var(--line)}
+  section.part:first-of-type{border-top:0}
+  .part-head{display:flex; align-items:baseline; gap:14px; margin-bottom:26px}
+  .part-head .n{font-family:var(--mono); font-size:.8rem; color:var(--accent);
+    letter-spacing:.1em; padding-top:3px}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:14px; margin:22px 0}
+  .tile{background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    padding:16px 16px 14px}
+  .tile .lab{font-family:var(--mono); font-size:.68rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted)}
+  .tile .big{font-family:var(--sans); font-weight:600; font-size:1.7rem;
+    letter-spacing:-.01em; margin:.28em 0 .12em; font-variant-numeric:tabular-nums}
+  .tile .cap{font-size:.86rem; color:var(--muted); line-height:1.45}
+
+  .tbl-scroll{overflow-x:auto; margin:20px 0; border:1px solid var(--line);
+    border-radius:9px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-family:var(--sans); font-size:.83rem}
+  th,td{padding:9px 13px; text-align:left; white-space:nowrap;
+    border-bottom:1px solid var(--line)}
+  thead th{font-weight:600; font-size:.72rem; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted); background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums}
+  td.best{color:var(--good); font-weight:600}
+  .flag{color:var(--warn); font-family:var(--mono); font-size:.9em}
+  caption{caption-side:bottom; text-align:left; color:var(--muted);
+    font-family:var(--sans); font-size:.78rem; padding:10px 4px 0}
+
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:26px; margin:24px 0}
+  @media (max-width:640px){.charts{grid-template-columns:1fr}}
+  .chart h4{margin:0 0 2px}
+  .chart .note{font-size:.8rem; color:var(--muted); margin:0 0 8px; font-weight:400}
+  .chart svg{width:100%; height:auto; display:block}
+  .chart .g-grid{stroke:var(--line-strong); stroke-width:1}
+  .chart .g-axis{stroke:var(--line-strong); stroke-width:1}
+  .chart .t-tick,.chart .t-cat{fill:var(--muted)}
+  .chart .t-tick{font-family:var(--mono); font-size:8px}
+  .chart .t-cat{font-family:var(--sans); font-size:8.5px}
+  .chart .t-val{fill:var(--ink); font-family:var(--mono); font-size:7.5px}
+  .chart .bar-in{fill:var(--accent)}
+  .chart .bar-sg{fill:var(--slate)}
+  .legend{display:flex; gap:16px; font-family:var(--mono); font-size:.72rem;
+    color:var(--muted); margin-top:6px}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:2px;
+    margin-right:5px; vertical-align:baseline}
+
+  .callout{border:1px solid var(--line); border-left:3px solid var(--warn);
+    background:var(--surface); border-radius:0 7px 7px 0; padding:14px 16px; margin:18px 0;
+    max-width:706px}
+  .callout.bug{border-left-color:var(--bad)}
+  .callout .lab{font-family:var(--mono); font-size:.7rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--warn); margin-bottom:5px}
+  .callout.bug .lab{color:var(--bad)}
+  .callout p{margin:.4rem 0; font-size:.92rem}
+
+  footer{border-top:1px solid var(--line); margin-top:60px; background:var(--surface)}
+  footer .wrap{padding:26px 24px 40px; color:var(--muted); font-size:.82rem;
+    font-family:var(--sans)}
+
+  a:focus-visible, summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  ::selection{background:var(--accent-soft)}
+  @media (max-width:560px){ body{font-size:16px} }
+  @media (prefers-reduced-motion:reduce){ *{scroll-behavior:auto !important} }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Technical results &middot; endoscopy vision models</div>
+    <h1>Endoscopy Calibration Study</h1>
+    <p class="sub">Does in-domain self-supervised pretraining on unlabeled endoscopy video
+      frames improve how <em>honest</em> a vision-foundation model's confidence is &mdash;
+      not just how accurate it is &mdash; when evaluated zero-shot? Four pretraining
+      settings, measured before and after, plus a case study in catching a training run that
+      looked fine and was not.</p>
+    <p class="sub">Scope note: these are frozen vision encoders evaluated by nearest-neighbour
+      retrieval &mdash; there is no language model or text head in this study.</p>
+    <div class="meta">
+      <span>corpus <b>GastroNet&#8209;5M</b> &rarr; eval <b>HyperKvasir</b></span>
+      <span>settings <b>DINO v1 &times; LeJEPA</b> &middot; <b>2 initialisations</b></span>
+      <span>tasks <b>5</b>, incl. zero-shot segmentation</span>
+      <span><a href="https://wandb.ai/models-ludwig-maximilian-university-of-munich/vlf-zeiss" target="_blank" rel="noopener">training curves (W&amp;B)</a></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#results">Results &mdash; before vs after</a>
+    <a href="#case-study">Case study &mdash; the LR&nbsp;=&nbsp;0 bug</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ================= RESULTS ================= -->
+<section class="part" id="results">
+  <div class="part-head"><span class="n">RESULTS</span>
+    <div><span class="eyebrow">Evaluation</span><h2>Before vs after self-supervised pretraining</h2></div></div>
+
+  <div class="prose">
+    <p>Four settings &mdash; <strong>{LeJEPA, DINO&nbsp;v1} &times; {SigLIP&#8209;2 ViT&#8209;B/16
+      init, ImageNet ViT&#8209;B/16 init}</strong> &mdash; each measured zero-shot on
+      <strong>HyperKvasir</strong> (five endoscopy tasks: 20&#8209;way finding, 4&#8209;way
+      category, upper&#8209;vs&#8209;lower GI tract, pathological&#8209;vs&#8209;other, and
+      zero-shot polyp segmentation), then re-measured after a short in-domain self-supervised
+      adaptation on <strong>GastroNet&#8209;5M</strong>, an unlabeled endoscopy-image corpus.
+      &ldquo;Zero-shot&rdquo; means a <strong>weighted k-nearest-neighbour vote on frozen
+      features</strong> (k&nbsp;=&nbsp;20, &tau;&nbsp;=&nbsp;0.07) &mdash; no classifier is
+      ever trained; the backbone is asked to carry the whole task on its own.</p>
+    <p>These are the &ldquo;before&rdquo; numbers: each backbone frozen at its public
+      initialisation, no in-domain adaptation yet. Weighted k-NN over a <code>reference</code>
+      split (60% of the labelled images), temperature fit on a <code>cal</code> split (15%),
+      metrics on the held-out <code>query</code> split (~2,650 images per classification task;
+      900 query masks for segmentation). <code>T</code> rows are after scalar temperature
+      scaling.</p>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <h4>Query accuracy <span class="note">(segmentation: Dice) &middot; higher is better</span></h4>
+      <svg viewBox="0 0 344 236" role="img" aria-label="Grouped bar chart of query accuracy per task, ImageNet init versus SigLIP-2 init. ImageNet is higher on all five tasks.">
+        <g class="g-grid">
+          <line x1="141" y1="12" x2="141" y2="210" opacity=".45"/>
+          <line x1="204" y1="12" x2="204" y2="210" opacity=".45"/>
+          <line x1="267" y1="12" x2="267" y2="210" opacity=".45"/>
+          <line x1="330" y1="12" x2="330" y2="210" opacity=".45"/>
+        </g>
+        <line class="g-axis" x1="78" y1="12" x2="78" y2="210"/>
+        <g class="t-tick" text-anchor="middle">
+          <text x="78" y="224">0</text><text x="141" y="224">.25</text>
+          <text x="204" y="224">.5</text><text x="267" y="224">.75</text><text x="330" y="224">1</text>
+        </g>
+        <g class="t-cat" text-anchor="end">
+          <text x="72" y="27">findings</text>
+          <text x="72" y="68">category</text>
+          <text x="72" y="109">tract</text>
+          <text x="72" y="150">pathology</text>
+          <text x="72" y="191">seg &middot; Dice</text>
+        </g>
+        <g class="bar-in">
+          <rect x="78" y="16" width="213.1" height="11" rx="1"/>
+          <rect x="78" y="57" width="236.9" height="11" rx="1"/>
+          <rect x="78" y="98" width="250.7" height="11" rx="1"/>
+          <rect x="78" y="139" width="237.3" height="11" rx="1"/>
+          <rect x="78" y="180" width="168.0" height="11" rx="1"/>
+        </g>
+        <g class="bar-sg">
+          <rect x="78" y="30" width="192.2" height="11" rx="1"/>
+          <rect x="78" y="71" width="225.9" height="11" rx="1"/>
+          <rect x="78" y="112" width="248.8" height="11" rx="1"/>
+          <rect x="78" y="153" width="228.9" height="11" rx="1"/>
+          <rect x="78" y="194" width="79.2" height="11" rx="1"/>
+        </g>
+        <g class="t-val" text-anchor="start">
+          <text x="294" y="25">.846</text><text x="317" y="66">.940</text>
+          <text x="317" y="107">.995</text><text x="317" y="148">.942</text><text x="250" y="189">.667</text>
+          <text x="273" y="39">.763</text><text x="308" y="80">.897</text>
+          <text x="317" y="121">.987</text><text x="311" y="162">.908</text><text x="161" y="203">.314</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>ImageNet init</span>
+        <span><i style="background:var(--slate)"></i>SigLIP-2 init</span>
+      </div>
+    </div>
+
+    <div class="chart">
+      <h4>NLL <span class="note">(pre-temperature) &middot; lower is better</span></h4>
+      <svg viewBox="0 0 344 236" role="img" aria-label="Grouped bar chart of pre-temperature negative log-likelihood per task, ImageNet init versus SigLIP-2 init. ImageNet is lower on all five tasks.">
+        <g class="g-grid">
+          <line x1="141" y1="12" x2="141" y2="210" opacity=".45"/>
+          <line x1="204" y1="12" x2="204" y2="210" opacity=".45"/>
+          <line x1="267" y1="12" x2="267" y2="210" opacity=".45"/>
+          <line x1="330" y1="12" x2="330" y2="210" opacity=".45"/>
+        </g>
+        <line class="g-axis" x1="78" y1="12" x2="78" y2="210"/>
+        <g class="t-tick" text-anchor="middle">
+          <text x="78" y="224">0</text><text x="141" y="224">.25</text>
+          <text x="204" y="224">.5</text><text x="267" y="224">.75</text><text x="330" y="224">1.0</text>
+        </g>
+        <g class="t-cat" text-anchor="end">
+          <text x="72" y="27">findings</text>
+          <text x="72" y="68">category</text>
+          <text x="72" y="109">tract</text>
+          <text x="72" y="150">pathology</text>
+          <text x="72" y="191">seg &middot; px</text>
+        </g>
+        <g class="bar-in">
+          <rect x="78" y="16" width="140.3" height="11" rx="1"/>
+          <rect x="78" y="57" width="44.6" height="11" rx="1"/>
+          <rect x="78" y="98" width="5.9" height="11" rx="1"/>
+          <rect x="78" y="139" width="38.3" height="11" rx="1"/>
+          <rect x="78" y="180" width="60.0" height="11" rx="1"/>
+        </g>
+        <g class="bar-sg">
+          <rect x="78" y="30" width="233.4" height="11" rx="1"/>
+          <rect x="78" y="71" width="80.4" height="11" rx="1"/>
+          <rect x="78" y="112" width="13.1" height="11" rx="1"/>
+          <rect x="78" y="153" width="64.5" height="11" rx="1"/>
+          <rect x="78" y="194" width="87.9" height="11" rx="1"/>
+        </g>
+        <g class="t-val" text-anchor="start">
+          <text x="221" y="25">.557</text><text x="125" y="66">.177</text>
+          <text x="87" y="107">.023</text><text x="120" y="148">.152</text><text x="141" y="189">.238</text>
+          <text x="300" y="39">.926</text><text x="161" y="80">.319</text>
+          <text x="95" y="121">.052</text><text x="146" y="162">.256</text><text x="169" y="203">.349</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>ImageNet init</span>
+        <span><i style="background:var(--slate)"></i>SigLIP-2 init</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead>
+        <tr><th>task</th><th>classes</th><th>init</th><th>T</th>
+          <th>acc</th><th>bal-acc</th><th>AUROC</th>
+          <th>ECE&nbsp;ew</th><th>ECE&nbsp;ew&nbsp;&middot;T</th><th>NLL</th><th>NLL&nbsp;&middot;T</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>hkv_tract</td><td class="num">2</td><td>imagenet <span class="flag">&#9888;</span></td>
+          <td class="num">1.38</td><td class="num">.9947</td><td class="num">.9955</td><td class="num">.9990</td>
+          <td class="num">.0023</td><td class="num">.0064</td><td class="num best">.0233</td><td class="num">.0229</td></tr>
+        <tr><td>hkv_tract</td><td class="num">2</td><td>siglip2 <span class="flag">&#9888;</span></td>
+          <td class="num">1.04</td><td class="num">.9872</td><td class="num">.9862</td><td class="num">.9977</td>
+          <td class="num">.0061</td><td class="num">.0038</td><td class="num">.0519</td><td class="num">.0515</td></tr>
+        <tr><td>hkv_pathology</td><td class="num">2</td><td>imagenet</td>
+          <td class="num">1.33</td><td class="num best">.9416</td><td class="num">.9013</td><td class="num">.9826</td>
+          <td class="num">.0170</td><td class="num">.0342</td><td class="num best">.1522</td><td class="num">.1581</td></tr>
+        <tr><td>hkv_pathology</td><td class="num">2</td><td>siglip2</td>
+          <td class="num">0.91</td><td class="num">.9084</td><td class="num">.8512</td><td class="num">.9565</td>
+          <td class="num">.0338</td><td class="num">.0260</td><td class="num">.2555</td><td class="num">.2547</td></tr>
+        <tr><td>hkv_category</td><td class="num">4</td><td>imagenet</td>
+          <td class="num">1.19</td><td class="num best">.9397</td><td class="num">.9434</td><td class="num">.9924</td>
+          <td class="num">.0258</td><td class="num">.0381</td><td class="num best">.1772</td><td class="num">.1822</td></tr>
+        <tr><td>hkv_category</td><td class="num">4</td><td>siglip2</td>
+          <td class="num">0.82</td><td class="num">.8968</td><td class="num">.9000</td><td class="num">.9802</td>
+          <td class="num">.0589</td><td class="num">.0330</td><td class="num">.3185</td><td class="num">.3099</td></tr>
+        <tr><td>hkv_findings</td><td class="num">20</td><td>imagenet</td>
+          <td class="num">1.61</td><td class="num best">.8455</td><td class="num">.6148</td><td class="num">.9474</td>
+          <td class="num">.0480</td><td class="num">.1114</td><td class="num best">.5567</td><td class="num">.5547</td></tr>
+        <tr><td>hkv_findings</td><td class="num">20</td><td>siglip2</td>
+          <td class="num">1.34</td><td class="num">.7628</td><td class="num">.5027</td><td class="num">.9232</td>
+          <td class="num">.0843</td><td class="num">.1438</td><td class="num">.9259</td><td class="num">.9122</td></tr>
+        <tr><td>hkv_seg</td><td class="num">2&nbsp;px</td><td>imagenet</td>
+          <td class="num">&ndash;</td><td class="num best">Dice&nbsp;.667</td><td class="num">mIoU&nbsp;.541</td><td class="num">&ndash;</td>
+          <td class="num">.0093</td><td class="num">&ndash;</td><td class="num best">.2384</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num">2&nbsp;px</td><td>siglip2</td>
+          <td class="num">&ndash;</td><td class="num">Dice&nbsp;.314</td><td class="num">mIoU&nbsp;.214</td><td class="num">&ndash;</td>
+          <td class="num">.0140</td><td class="num">&ndash;</td><td class="num">.3486</td><td class="num">&ndash;</td></tr>
+      </tbody>
+      <caption>Weighted k-NN, k&nbsp;=&nbsp;20, &tau;&nbsp;=&nbsp;0.07, ImageNet-normalised
+        224&nbsp;px features (768-d, LayerNorm of the mean patch token).
+        <span class="flag">&#9888;</span> = accuracy &gt; 0.98, flagged for leakage inspection.
+        <span style="color:var(--good)">Green</span> = better of the two inits on that metric.</caption>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h4>What the baseline says</h4>
+    <ul>
+      <li><strong>ImageNet init beats SigLIP-2 on every task</strong>, on both discrimination
+        (accuracy, NLL) and mostly on calibration &mdash; the opposite of the pre-registered
+        sanity guess, that the web-scale contrastive model would transfer better. For endoscopy
+        k-NN it does not: supervised ImageNet features are more linearly separable here, and
+        their patch tokens carry far more local structure (segmentation Dice 0.67 vs 0.31).</li>
+      <li><strong><code>hkv_tract</code> is flagged &mdash; confirmed structural, not
+        leakage.</strong> A dedicated ontology audit found <strong>23 of 23</strong> HyperKvasir
+        findings are tract-exclusive (each occurs in upper-GI or lower-GI images only, never
+        both), so upper-vs-lower-GI is recoverable from coarse image content almost by
+        construction &mdash; independent of the accuracy number itself. Treated as an
+        interpretation caveat, recorded alongside every result.</li>
+      <li><strong>Temperature scaling is not uniformly helpful.</strong> For ImageNet, T&nbsp;&gt;&nbsp;1
+        and post-T ECE sometimes rises (<code>findings</code>: .048&nbsp;&rarr;&nbsp;.111): the
+        k-NN &ldquo;logits&rdquo; are not true logits, and a single scalar fit on a 15% cal split
+        can over-correct. For SigLIP-2 on <code>category</code>/<code>pathology</code>,
+        T&nbsp;&lt;&nbsp;1 and post-T ECE improves. The pre-vs-post-adaptation <em>delta</em> is
+        the intended read, not the absolute value.</li>
+      <li><strong>The 20-way findings task is imbalanced.</strong> Balanced accuracy ~0.61
+        (imagenet) / ~0.50 (siglip2) against raw accuracy ~0.85 &mdash; strong on common
+        findings, weak on rare ones, AUROC still ~0.95.</li>
+    </ul>
+  </div>
+
+  <h3>Post-adaptation results &mdash; all 4 settings, final</h3>
+  <div class="prose">
+    <p>Every setting: a short, fixed dose of in-domain self-supervised adaptation on the
+      curated GastroNet-5M tier, then the same zero-shot k-NN evaluation.
+      <strong>&Delta; = after &minus; before</strong>; negative &Delta; on ECE/NLL means
+      adaptation made the features better-calibrated.
+      <span style="color:var(--good)">Green</span> = it helped that metric,
+      <span style="color:var(--bad)">red</span> = it hurt it,
+      <span style="color:var(--muted)">grey</span> = within run-to-run noise (&le;&nbsp;.002).</p>
+    <p><strong>ECE ew</strong> = Expected Calibration Error, 15 equal-width confidence bins: the
+      population-weighted mean of |mean confidence &minus; accuracy| per bin (lower = the
+      model's confidence is honest). <strong>ECE ew&nbsp;&middot;T</strong> and
+      <strong>NLL&nbsp;&middot;T</strong> are the same metrics after temperature scaling.
+      Segmentation has no <code>&middot;T</code> variant.</p>
+    <p><strong>This table is on a leakage-mitigated split.</strong> HyperKvasir carries no
+      patient/procedure id, so near-duplicate frames from one procedure could straddle
+      <code>reference</code> and <code>query</code>. Every <code>cal</code>/<code>query</code>
+      image within 6 bits of perceptual-hash distance from any <code>reference</code> image was
+      dropped before scoring &mdash; <strong>17% of both splits</strong>. <code>hkv_tract</code>
+      stayed flagged even after dedup (99.4%/98.5% accuracy) &mdash; upper-vs-lower-GI is
+      genuinely near-trivial from global image appearance, not a split artefact.</p>
+  </div>
+
+  <h4>DINO&nbsp;v1 / ImageNet init <span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; effective rank 51.7, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;&middot;T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;&middot;T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0155</td><td class="num best">&minus;.0162</td><td class="num best">&minus;.045</td><td class="num best">&minus;.076</td><td class="num best">+.021</td><td class="num best">+.035</td><td class="num best">+.009</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0095</td><td class="num best">&minus;.0032</td><td class="num" style="color:var(--bad)">+.024</td><td class="num" style="color:var(--muted)">+.004</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num" style="color:var(--muted)">&minus;.004</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num" style="color:var(--muted)">+.0003</td><td class="num" style="color:var(--bad)">+.0080</td><td class="num" style="color:var(--bad)">+.023</td><td class="num" style="color:var(--bad)">+.012</td><td class="num" style="color:var(--muted)">&minus;.003</td><td class="num" style="color:var(--bad)">&minus;.008</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--muted)">+.0007</td><td class="num best">&minus;.0020</td><td class="num best">&minus;.008</td><td class="num best">&minus;.007</td><td class="num" style="color:var(--muted)">+.001</td><td class="num" style="color:var(--muted)">+.001</td><td class="num" style="color:var(--muted)">+.001</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0035</td><td class="num">&ndash;</td><td class="num best">&minus;.026</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.061</td></tr>
+      </tbody>
+      <caption>DINO&nbsp;v1 / GastroNet-5M / ImageNet init.</caption>
+    </table>
+  </div>
+
+  <h4>DINO&nbsp;v1 / SigLIP-2 init <span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; effective rank 46.7, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;&middot;T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;&middot;T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0646</td><td class="num best">&minus;.0687</td><td class="num best">&minus;.413</td><td class="num best">&minus;.438</td><td class="num best">+.092</td><td class="num best">+.144</td><td class="num best">+.015</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0492</td><td class="num best">&minus;.0103</td><td class="num best">&minus;.153</td><td class="num best">&minus;.152</td><td class="num best">+.047</td><td class="num best">+.055</td><td class="num best">+.014</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num best">&minus;.0247</td><td class="num" style="color:var(--muted)">&minus;.0014</td><td class="num best">&minus;.111</td><td class="num best">&minus;.111</td><td class="num best">+.037</td><td class="num best">+.053</td><td class="num best">+.032</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--muted)">&minus;.0028</td><td class="num" style="color:var(--muted)">&minus;.0003</td><td class="num best">&minus;.038</td><td class="num best">&minus;.039</td><td class="num best">+.010</td><td class="num best">+.010</td><td class="num" style="color:var(--muted)">+.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0035</td><td class="num">&ndash;</td><td class="num best">&minus;.131</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.402</td></tr>
+      </tbody>
+      <caption>DINO&nbsp;v1 / GastroNet-5M / SigLIP-2 init. The single largest gain across every
+        setting: segmentation Dice <strong>+0.40</strong>.</caption>
+    </table>
+  </div>
+
+  <h4>LeJEPA / SigLIP-2 init <span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; effective rank 25.8, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;&middot;T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;&middot;T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0521</td><td class="num best">&minus;.0724</td><td class="num" style="color:var(--bad)">+.126</td><td class="num best">&minus;.000</td><td class="num" style="color:var(--bad)">&minus;.058</td><td class="num" style="color:var(--bad)">&minus;.014</td><td class="num" style="color:var(--bad)">&minus;.036</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0374</td><td class="num best">&minus;.0149</td><td class="num" style="color:var(--bad)">+.068</td><td class="num" style="color:var(--bad)">+.068</td><td class="num" style="color:var(--bad)">&minus;.037</td><td class="num" style="color:var(--bad)">&minus;.025</td><td class="num" style="color:var(--muted)">&minus;.009</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num best">&minus;.0189</td><td class="num best">&minus;.0053</td><td class="num" style="color:var(--bad)">+.054</td><td class="num" style="color:var(--bad)">+.046</td><td class="num" style="color:var(--bad)">&minus;.030</td><td class="num" style="color:var(--bad)">&minus;.051</td><td class="num" style="color:var(--bad)">&minus;.023</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--bad)">+.0087</td><td class="num" style="color:var(--muted)">+.0034</td><td class="num" style="color:var(--bad)">+.072</td><td class="num" style="color:var(--bad)">+.072</td><td class="num" style="color:var(--bad)">&minus;.030</td><td class="num" style="color:var(--bad)">&minus;.039</td><td class="num" style="color:var(--muted)">&minus;.006</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0222</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">+.138</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.128</td></tr>
+      </tbody>
+      <caption>LeJEPA / GastroNet-5M / SigLIP-2 init. ECE improves, at an accuracy/NLL cost &mdash;
+        the trade-off discussed below.</caption>
+    </table>
+  </div>
+
+  <h4>LeJEPA / ImageNet init <span class="flag" style="font-size:.8em">&#9888; severe regression</span> <span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; effective rank 33.9, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;&middot;T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;&middot;T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num" style="color:var(--bad)">+.367</td><td class="num best">&minus;.072</td><td class="num" style="color:var(--bad)">+6.91</td><td class="num" style="color:var(--bad)">+2.07</td><td class="num" style="color:var(--bad)">&minus;.625</td><td class="num" style="color:var(--bad)">&minus;.447</td><td class="num" style="color:var(--bad)">&minus;.273</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num" style="color:var(--bad)">+.183</td><td class="num" style="color:var(--bad)">+.116</td><td class="num" style="color:var(--bad)">+1.94</td><td class="num" style="color:var(--bad)">+.750</td><td class="num" style="color:var(--bad)">&minus;.278</td><td class="num" style="color:var(--bad)">&minus;.423</td><td class="num" style="color:var(--bad)">&minus;.234</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num" style="color:var(--bad)">+.147</td><td class="num" style="color:var(--bad)">+.127</td><td class="num" style="color:var(--bad)">+1.30</td><td class="num" style="color:var(--bad)">+.450</td><td class="num" style="color:var(--bad)">&minus;.188</td><td class="num" style="color:var(--bad)">&minus;.343</td><td class="num" style="color:var(--bad)">&minus;.410</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--bad)">+.075</td><td class="num" style="color:var(--bad)">+.023</td><td class="num" style="color:var(--bad)">+.592</td><td class="num" style="color:var(--bad)">+.529</td><td class="num" style="color:var(--bad)">&minus;.292</td><td class="num" style="color:var(--bad)">&minus;.364</td><td class="num" style="color:var(--bad)">&minus;.238</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--muted)">+.008</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">+.095</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">&minus;.136</td></tr>
+      </tbody>
+      <caption>LeJEPA / GastroNet-5M / ImageNet init. Raw NLL &Delta; shown to 2 decimals &mdash;
+        the magnitudes are large, not a formatting artefact.</caption>
+    </table>
+  </div>
+
+  <div class="callout bug">
+    <div class="lab">Flag &mdash; LeJEPA on the ImageNet init is a genuine, severe failure mode</div>
+    <p>Query accuracy on <code>hkv_findings</code> collapsed from <strong>82.4% before to
+      19.9% after</strong> adaptation (AUROC 0.95&nbsp;&rarr;&nbsp;0.67); every classification
+      task lost 19&ndash;62 accuracy points. This was checked against a pipeline bug and ruled
+      out: the pre-adaptation baselines in the same evaluation sweep are normal, the other three
+      settings in the same sweep are normal, and the adaptation run itself shows no
+      instability &mdash; loss fell smoothly, no non-finite-loss skips, effective rank stayed at
+      33.9 (healthy; classic representation collapse reads ~1). AUROC staying above 0.5 confirms
+      the features still carry <em>some</em> signal &mdash; the k-NN vote is just badly
+      miscalibrated to the point of being nearly useless at the decision threshold.</p>
+    <p>Reading: LeJEPA's isotropy-regularising term aggressively reshapes the batch toward a
+      standard Gaussian. Applied full-backbone to an already highly class-structured
+      <em>supervised</em> ImageNet embedding, it appears to overwrite that structure faster than
+      the light layer-wise learning-rate decay can protect it &mdash; the representation stays
+      spread out (rank) but loses its linear/k-NN separability. A gentler-optimisation follow-up
+      (lower base LR, stronger layer-wise decay) is the natural next experiment.</p>
+  </div>
+
+  <div class="prose">
+    <h4>The story across all four settings</h4>
+    <ul>
+      <li><strong>DINO is the reliable adapter.</strong> It improved calibration and/or
+        segmentation from <em>both</em> initialisations, with no accuracy cost anywhere. From
+        SigLIP-2 the gains are large (ECE &minus;0.01 to &minus;0.06, seg Dice
+        <strong>+0.40</strong>); from the already-strong ImageNet init they are smaller but still
+        net positive.</li>
+      <li><strong>LeJEPA is powerful but initialisation-sensitive.</strong> From SigLIP-2 (room to
+        improve) it trades accuracy for markedly better calibration and a strong segmentation gain
+        (+0.13 Dice). From ImageNet (already excellent) it is destructive &mdash; the aggressive
+        regulariser has nothing to gain and a great deal to lose.</li>
+      <li><strong>Findings and segmentation are where adaptation matters most</strong> for the
+        three well-behaved settings; the near-saturated tract/pathology tasks barely move either
+        way.</li>
+      <li><strong>Practical takeaway:</strong> if the deployment init is a strong supervised
+        backbone, prefer a gentle self-distillation objective (DINO) for in-domain adaptation;
+        reserve an aggressive distributional regulariser (LeJEPA) for weaker starting points, or
+        pair it with a much smaller learning rate when starting from a strong supervised init.</li>
+    </ul>
+  </div>
+
+  <h3>Compute &amp; storage</h3>
+  <div class="prose">
+    <p>Everything ran single-GPU on a shared H100/A100 cluster; every result and training run
+      records the exact GPU model, node and timing.</p>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>setting</th><th>GPU</th><th>wall time</th><th>speed</th></tr></thead>
+      <tbody>
+        <tr><td>LeJEPA / SigLIP-2</td><td>A100&#8209;80GB</td><td class="num">1h 30m</td><td class="num">2.65&nbsp;it/s</td></tr>
+        <tr><td>DINO / ImageNet</td><td>H100&nbsp;94GB</td><td class="num">3h 43m</td><td class="num">1.07&nbsp;it/s</td></tr>
+        <tr><td>DINO / SigLIP-2</td><td>H100&nbsp;94GB</td><td class="num">2h 54m</td><td class="num">1.09&nbsp;it/s</td></tr>
+        <tr><td>LeJEPA / ImageNet</td><td>H100&nbsp;94GB</td><td class="num">1h 04m</td><td class="num">3.79&nbsp;it/s</td></tr>
+      </tbody>
+      <caption>All single-GPU, batch 128, bf16, gradient checkpointing. Speed varies node-to-node
+        by up to 3&times; on this shared cluster.</caption>
+    </table>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="lab">Total run storage</div>
+      <div class="big">~12.7&nbsp;GB</div>
+      <div class="cap">GastroNet tier 8.1&nbsp;GB &middot; staged HyperKvasir 3.7&nbsp;GB &middot;
+        4 checkpoints 1.3&nbsp;GB &middot; feature cache 0.6&nbsp;GB.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Eval sweep, before / after a scheduling fix</div>
+      <div class="big">7h &rarr; 12m</div>
+      <div class="cap">An oversized resource request left 6 evaluation jobs starved of
+        scheduler priority for 7 hours; trimming it let all 6 complete within 12 minutes of
+        submission.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Settings trained &middot; evaluated</div>
+      <div class="big">4 / 4</div>
+      <div class="cap">Every objective&times;init combination, on the leakage-mitigated split,
+        before and after.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CASE STUDY ================= -->
+<section class="part" id="case-study">
+  <div class="part-head"><span class="n">CASE STUDY</span>
+    <div><span class="eyebrow">Reliability engineering</span><h2>The <code>LR = 0</code> bug</h2></div></div>
+
+  <div class="prose">
+    <p>The first full-scale training job started on an A100 the morning of 2026-09-08. Watching
+      its scalar dashboard caught something the smoke tests could not: <strong>it was not
+      training at all.</strong></p>
+  </div>
+
+  <div class="callout bug">
+    <div class="lab">Symptom</div>
+    <p>Learning rate flat at <code>0.000e+00</code> for over 10,000 steps. Loss flat at
+      <code>0.737</code> over the same span. The variance-hinge loss term pinned at its floor.
+      Zero checkpoints written to the run directory.</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Two independent bugs compounded:</strong></p>
+    <ol>
+      <li><strong>The framework's own step counter never advanced.</strong> The training step
+        called the raw optimizer's <code>.step()</code> instead of the wrapped one &mdash; a
+        workaround for an intermittent CPU hang on a login node, kept in place on GPU where it
+        was never needed. On GPU that bypass means the framework's step counter stays at 0.
+        Consequences: the cosine learning-rate schedule, keyed on that counter, sits at its
+        warmup-step-zero value &mdash; <strong>LR &equiv; 0</strong>, so every optimizer step is a
+        no-op; and the checkpoint trigger, keyed on the same counter, never fires either &mdash; a
+        crash-and-resume would have restarted from scratch, forever.</li>
+      <li><strong>The data pipeline's notion of &ldquo;one epoch&rdquo; was 12&times; too
+        long.</strong> An epoch-length setting meant for the whole pipeline had been applied
+        per data-loading worker instead, so with 12 parallel workers one logical epoch became
+        12&times; longer than intended (roughly 5 hours). The <em>other</em> checkpoint trigger,
+        keyed on epoch-end, would not have fired inside the job's time limit either.</li>
+    </ol>
+    <p>Together: the run could produce nothing usable, and would have looped indefinitely,
+      silently, across every restart.</p>
+  </div>
+
+  <div class="callout">
+    <div class="lab">Fix</div>
+    <p><strong>1.</strong> Use the wrapped optimizer step on GPU (the raw bypass kept only for
+      CPU smoke tests) &mdash; the step counter advances, so the schedule and the checkpoint
+      trigger both work.</p>
+    <p><strong>2.</strong> Move the epoch-length setting to apply <em>after</em> the parallel
+      workers are merged back into one stream, not before &mdash; verified directly: request N
+      batches, get exactly N, stable across epochs and worker counts.</p>
+  </div>
+
+  <div class="prose">
+    <p>The GPU smoke test had passed because a handful of steps at a tiny batch size sits
+      entirely inside learning-rate warmup &mdash; the rate is near-zero there whether or not the
+      counter moves, and the smoke test only checks that a checkpoint file appears and that
+      resuming from it works, which the epoch-end trigger did handle at that scale. The bug only
+      showed up under a full-scale run, which is exactly why the run was being watched live
+      rather than fired and checked on the next weekday.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Endoscopy vision-foundation calibration study &middot; results finalised 2026-09-12 &middot;
+    full training curves and hyperparameters on
+    <a href="https://wandb.ai/models-ludwig-maximilian-university-of-munich/vlf-zeiss" target="_blank" rel="noopener">Weights &amp; Biases</a>.
+    A fuller engineering write-up (architecture, code walkthrough, full timeline) is available on request.
+  </div>
+</footer>
+
+</body>
+</html>

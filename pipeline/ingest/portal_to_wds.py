@@ -120,16 +120,27 @@ def main() -> None:
         _fetch_to(sess, base, fid, zp, f.get("size", 0))
         dl = time.time() - t0
         new_ph = []
-        with zipfile.ZipFile(zp) as zf:
-            infos = [x for x in zf.infolist()
-                     if not x.is_dir() and os.path.splitext(x.filename)[1].lower() in _IMG_EXTS]
-            batch = ((zf.read(x.filename), a.size, a.quality) for x in infos)
-            for x, (ph, jpg) in zip(infos, pool.imap(_one_image, batch, chunksize=64)):
-                if jpg is None or ph in seen_ph:
-                    dropped += 1; continue
-                seen_ph.add(ph); new_ph.append(ph)
-                key = f"{name[:-4]}/{os.path.splitext(os.path.basename(x.filename))[0]}"
-                sw.add(key, jpg); kept += 1
+        try:
+            with zipfile.ZipFile(zp) as zf:
+                infos = [x for x in zf.infolist()
+                         if not x.is_dir() and os.path.splitext(x.filename)[1].lower() in _IMG_EXTS]
+                batch = ((zf.read(x.filename), a.size, a.quality) for x in infos)
+                for x, (ph, jpg) in zip(infos, pool.imap(_one_image, batch, chunksize=64)):
+                    if jpg is None or ph in seen_ph:
+                        dropped += 1; continue
+                    seen_ph.add(ph); new_ph.append(ph)
+                    key = f"{name[:-4]}/{os.path.splitext(os.path.basename(x.filename))[0]}"
+                    sw.add(key, jpg); kept += 1
+        except (zipfile.BadZipFile, OSError) as e:
+            # Corrupted/truncated download (portal-side, or an interrupted fetch).
+            # Don't mark it done -> a later backfill re-fetches and retries it;
+            # don't crash the whole multi-hour run over one bad shard.
+            if os.path.exists(zp):
+                os.remove(zp)
+            with open(os.path.join(a.out, "_failed.txt"), "a") as fl:
+                fl.write(f"{name}\t{e!r}\n")
+            print(f"[{i}/{len(files)}] {name}  FAILED ({e!r}) -- skipping, not marked done")
+            continue
         os.remove(zp)
         with open(os.path.join(a.out, f"{name[:-4]}.phash"), "w") as m:
             m.write("\n".join(new_ph))

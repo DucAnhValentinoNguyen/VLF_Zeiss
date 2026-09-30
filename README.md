@@ -3,8 +3,8 @@
 Zero-shot **calibration** (ECE / NLL) of self-supervised vision foundation models
 on **HyperKvasir**, measured **before vs after** in-domain SSL pretraining on
 **GastroNet-5M**. SSL training + eval feature extraction run on **PyTorch
-Lightning**; GastroNet-5M lives in an **AWS S3 data lake** and is **streamed**
-into LRZ training jobs (see `pipeline/`).
+Lightning**; GastroNet-5M is curated straight from the Cortex portal into a
+local WebDataset tier on LRZ (see `pipeline/`).
 
 Independent repo — its own venv (`.venv`), its own code. No dependency on any
 sibling project.
@@ -16,10 +16,9 @@ ViT-B/16 init}**.
 
 1. Evaluate all 4 **zero-shot on HyperKvasir** (frozen init).
 2. **SSL-pretrain** each on GastroNet-5M (unlabeled): DINO v1 / LeJEPA, full
-   backbone, single GPU. Data streams from the S3 lake over presigned HTTPS
-   with a local shard cache (`gastronet_source: s3_webdataset`, the default) —
-   epoch 1 pays the one-time egress, every later epoch / job resubmit reads
-   local disk. See `pipeline/README.md` for the lake build and cost.
+   backbone, single GPU. Data is read from the curated 224px WebDataset tier on
+   local LRZ disk (`gastronet_source: local_webdataset`, the default). See
+   `pipeline/README.md` for how that tier is built.
 3. Evaluate all 4 **zero-shot on HyperKvasir again**.
 
 Zero-shot = **weighted k-NN** on frozen features (k=20, τ=0.07), temperature
@@ -53,7 +52,7 @@ vlfz/
   ssl/     lejepa_lib.py      SIGReg (Epps-Pulley) + variance hinge + stop-grad prediction
            dino_lib.py        DINO loss + centering + schedules
            pretrain.py        Lightning SSLModule + GastroNetDataModule (--objective/--init/--stage)
-  data/    gastronet.py       zip-shard (local) + curated WebDataset (local/S3-streamed+cached) reader
+  data/    gastronet.py       curated WebDataset reader (local, the live path; S3-streamed mode dormant)
            hyperkvasir.py     HyperKvasir tasks + splits ; registry.py dataset dispatch
            transforms.py folds.py
   eval/    features.py        cached frozen-feature extraction via Lightning Trainer.predict()
@@ -63,8 +62,9 @@ vlfz/
            seg.py             zero-shot polyp segmentation (dense patch k-NN)
            metrics.py run_eval.py
   report/  aggregate.py pivot.py leakage_audit.py
-pipeline/  GastroNet-5M AWS data lake: Terraform infra + ingest/catalog/curate/dq
-           + stage_in.sh (login-node one-time cache seed). See pipeline/README.md.
+pipeline/  GastroNet-5M ingest: portal_to_wds.py (portal -> curated WebDataset on
+           LRZ, the live path) + a dormant AWS S3 lake (Terraform/catalog/curate,
+           retired — see pipeline/README.md).
 lrz/       job_env.sh  setup_env.sh  sbatch_*.sbatch  submit_*.sh  download_gastronet.sh
 tests/     unit tests + smoke_eval.sh / smoke_ssl.sh
 ```
@@ -94,23 +94,33 @@ Layout under `$HKV_ROOT`:
 - Stratified image-level split (reference / cal / query = 60% / 15% / 25%) shared across all classification tasks.
 - Perceptual hash deduplication (`imagehash.phash`, Hamming distance ≤ 6 bits) filters out cal and query frames that are near-duplicates of reference images, preventing cross-split video frame leakage.
 
-**GastroNet-5M** (SSL corpus) lives in an AWS S3 lake, built once from
-`pipeline/` (Terraform + an ephemeral ingest/curation EC2 — see
-`pipeline/README.md` for the architecture, runbook and cost). LRZ only needs a
-**read-only** IAM key (`~/.aws/credentials` profile `gastronet-reader`,
-`chmod 600` — never commit it) and the bucket name in `~/.gastronet_bucket`.
-Training then just works:
+**GastroNet-5M** (SSL corpus) is curated directly from the Cortex portal onto
+LRZ local disk — `pipeline/ingest/portal_to_wds.py` streams each portal zip,
+decodes/dedups/resizes to 224px, packs it into WebDataset `.tar` shards under
+`$GASTRONET_ROOT/webdataset/`, then deletes the zip, so the ~1TB raw corpus
+never has to land at once. This is the live path; training then just works:
 
 ```bash
 python -m vlfz.ssl.pretrain --objective lejepa --init siglip2 --stage full --corpus gastronet
-# gastronet_source defaults to s3_webdataset: streams + caches to
-# $GASTRONET_ROOT/.wds_cache automatically, no separate download step.
+# gastronet_source defaults to local_webdataset: reads $GASTRONET_ROOT/webdataset/*.tar directly.
 ```
 
-To seed the cache in one shot instead of paying it out over epoch 1 (or to use
-the raw portal zips / a pre-staged tier instead of streaming), see
-`pipeline/stage/stage_in.sh` and the `--source {local_zip,local_webdataset,
-s3_webdataset}` flag.
+Only 60 of 506 portal zips are ingested so far (581,518 images, ~8GB curated).
+That's already enough: `ssl.subset_images` samples ~700k images for a short
+in-domain adaptation from a strong pretrained init, not pretraining from
+scratch — the current runs see ~1.7M image-presentations across 3 epochs. To
+ingest more anyway (e.g. for a larger SSL subset):
+
+```bash
+bash lrz/backfill_gastronet_full.sh   # resumes from pipeline/ingest's _ingested.txt, skips done shards
+```
+
+An earlier **AWS S3 data lake** design (Terraform + an ephemeral ingest EC2,
+`pipeline/infra/`) is retired — the EC2 kept dying ~20min after boot on a
+new-account restriction, so this repo never depends on it. The code
+(`portal_to_s3.py`, `pipeline/infra/*.tf`, and the `s3_webdataset` /
+`local_zip` source modes in `vlfz/data/gastronet.py`) is kept as a dormant
+reference, not on the active path — see `pipeline/README.md`.
 
 ## Run
 
@@ -118,7 +128,7 @@ s3_webdataset}` flag.
 # 1. pre-SSL baselines on HyperKvasir
 bash lrz/submit_eval_chain.sh ONLY_PRE=1
 
-# 2. SSL pretraining (4 runs, self-resubmitting), streaming GastroNet-5M from S3.
+# 2. SSL pretraining (4 runs, self-resubmitting), reading GastroNet-5M from local LRZ disk.
 CORPUS=gastronet bash lrz/submit_ssl_matrix.sh    # or TIER=lejepa for the cheap 2-run cut
 
 # 3. post-SSL eval + aggregate (chained; picks up whatever checkpoints exist)

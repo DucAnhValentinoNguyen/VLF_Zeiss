@@ -1,0 +1,477 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"></head><body>
+<title>Full-Corpus SSL Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  :root{
+    --bg:#f5f7f8; --surface:#ffffff; --surface-2:#eef1f3;
+    --ink:#14181b; --muted:#59626c; --line:#e0e4e8; --line-strong:#c9d0d6;
+    --accent:#0d7a84; --accent-soft:#0d7a8422; --slate:#6b7a86;
+    --good:#1f9d57; --warn:#b0761b; --bad:#c0453c;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+      --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+      --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+      --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+    --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+    --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+    --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.62}
+  .wrap{max-width:880px;margin:0 auto;padding:0 24px}
+  .prose{max-width:706px}
+  .prose p,.prose ul,.prose ol{margin:0 0 1rem}
+  .prose ul,.prose ol{padding-left:1.2rem}
+  .prose li{margin:.3rem 0}
+  a{color:var(--accent)}
+  strong{font-weight:600}
+  h1,h2,h3,h4{font-family:var(--sans);font-weight:600;line-height:1.25;margin:0}
+  h2{font-size:1.4rem;margin:0 0 .2rem}
+  h3{font-size:1.05rem;margin:2rem 0 .5rem}
+  h4{font-size:.94rem;margin:1.2rem 0 .35rem}
+  .eyebrow{font-family:var(--mono);font-size:.7rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  code{font-family:var(--mono);font-size:.85em;background:var(--surface-2);padding:.1em .35em;border-radius:3px;border:1px solid var(--line)}
+  header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+  .top .wrap{padding-top:32px;padding-bottom:26px}
+  .kicker{font-family:var(--mono);font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+  h1{font-size:1.9rem;letter-spacing:-.01em;margin-bottom:.45rem}
+  .sub{font-size:1.02rem;color:var(--muted);max-width:640px;margin:0}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:18px;font-family:var(--mono);font-size:.72rem}
+  .meta span{border:1px solid var(--line);border-radius:100px;padding:4px 10px;color:var(--muted);background:var(--bg)}
+  .meta b{color:var(--ink);font-weight:500}
+  nav.toc{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+  nav.toc .wrap{display:flex;flex-wrap:wrap;gap:2px 4px;padding-top:8px;padding-bottom:8px}
+  nav.toc a{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:5px;white-space:nowrap}
+  nav.toc a:hover{color:var(--ink);background:var(--surface-2)}
+  section.part{padding:46px 0 6px;border-top:1px solid var(--line)}
+  section.part:first-of-type{border-top:0}
+  .part-head{display:flex;align-items:baseline;gap:12px;margin-bottom:22px}
+  .part-head .n{font-family:var(--mono);font-size:.78rem;color:var(--accent);letter-spacing:.08em;padding-top:2px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:20px 0}
+  .tile{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:14px 15px 12px}
+  .tile .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .tile .big{font-family:var(--sans);font-weight:600;font-size:1.4rem;margin:.25em 0 .1em}
+  .tile .cap{font-size:.82rem;color:var(--muted);line-height:1.4}
+  .tbl-scroll{overflow-x:auto;margin:18px 0;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-family:var(--sans);font-size:.82rem}
+  th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{font-weight:600;font-size:.7rem;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  .decision{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);border-radius:0 8px 8px 0;padding:14px 16px;margin:16px 0}
+  .decision .lab{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;font-weight:600}
+  .decision p{margin:.35rem 0;font-size:.92rem}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--warn);background:var(--surface);border-radius:0 8px 8px 0;padding:14px 16px;margin:16px 0;max-width:706px}
+  .callout.bad{border-left-color:var(--bad)}
+  .callout.good{border-left-color:var(--good)}
+  .callout .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--warn);margin-bottom:5px;font-weight:600}
+  .callout.bad .lab{color:var(--bad)}
+  .callout.good .lab{color:var(--good)}
+  .callout p{margin:.35rem 0;font-size:.9rem}
+  .phases{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);margin:18px 0}
+  .phase{padding:13px 16px;border-top:1px solid var(--line)}
+  .phase:first-child{border-top:0}
+  .phase .id{font-family:var(--mono);font-size:.72rem;color:var(--accent);font-weight:600;letter-spacing:.05em}
+  .phase .t{font-family:var(--sans);font-weight:600;font-size:.92rem;margin:.15em 0 .3em}
+  .phase .d{font-size:.88rem;color:var(--ink-2,var(--ink));line-height:1.5}
+  .phase .d code{font-size:.85em}
+  .pill{font-family:var(--mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:100px;margin-left:8px;border:1px solid transparent}
+  .pill.now{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:var(--accent-soft)}
+  .pill.next{color:var(--muted);border-color:var(--line-strong);background:var(--surface-2)}
+  .pill.blocked{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+  .pill.done{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,transparent);background:color-mix(in srgb,var(--good) 12%,transparent)}
+  ul.tight li{margin:.2rem 0}
+  footer{border-top:1px solid var(--line);margin-top:50px;background:var(--surface)}
+  footer .wrap{padding:22px 24px 34px;color:var(--muted);font-size:.8rem;font-family:var(--sans)}
+  @media (max-width:560px){body{font-size:16px}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Execution Plan · Internal</div>
+    <h1>Drop SigLIP-2, Train on the Full GastroNet-5M Corpus</h1>
+    <p class="sub">Two settings instead of four (DINO/LeJEPA &times; ImageNet only), trained on all
+      ~4.9M images instead of a 581k subset, single-GPU but with the free inefficiencies removed,
+      ending in a promoted, durably-stored "foundation model" checkpoint for future fine-tuning.</p>
+    <div class="meta">
+      <span>date <b>2026-09-16</b></span>
+      <span>repo <b>VLF_Zeiss</b></span>
+      <span>branch <b>feat/calibration-eval-pipeline</b></span>
+      <span>full history <b>docs/PLAN.md</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#context">Context</a>
+    <a href="#live-status">Live status</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#changes">What changes</a>
+    <a href="#foundation">Foundation model</a>
+    <a href="#files">Files</a>
+    <a href="#verify">Verification</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<section class="part" id="context">
+  <div class="part-head"><span class="n">CONTEXT</span><div><h2>Why this plan exists</h2></div></div>
+  <div class="prose">
+    <p>The published 4-setting result (2026-09-12/13) trained on a 60-shard / 581k-image
+      subset (12% of GastroNet-5M) and found ImageNet beating SigLIP-2 on every HyperKvasir
+      task pre-SSL, with LeJEPA/ImageNet regressing severely post-SSL. Two decisions came out
+      of reviewing that: drop SigLIP-2 entirely &mdash; matching a teammate's
+      (<code>lilian70nn/Endoscopy</code>) pipeline for a fairer comparison &mdash; and require
+      training on the <strong>full</strong> corpus, not a subset. The end goal changed too:
+      this isn't a comparison exercise anymore. Whichever setting wins gets promoted to a
+      "foundation model" checkpoint that further downstream fine-tuning will build on.</p>
+  </div>
+  <div class="tiles">
+    <div class="tile"><div class="lab">Matrix</div><div class="big">4 &rarr; 2</div>
+      <div class="cap">DINO + LeJEPA &times; ImageNet only. SigLIP-2 code stays, dormant &mdash;
+        same treatment as the unused RealColon / EDL modules.</div></div>
+    <div class="tile"><div class="lab">Corpus</div><div class="big">12% &rarr; 100%</div>
+      <div class="cap">581k images (60/506 zips) &rarr; the full ~4.9M / 506 zips,
+        curated to ~68&nbsp;GB (measured from the 69-zip rate: 9.3&nbsp;GB).</div></div>
+    <div class="tile"><div class="lab">Coverage guarantee</div><div class="big">sampled &rarr; exact</div>
+      <div class="cap">WebDataset <code>resampled=True</code> (samples with replacement, no
+        epoch ever sees 100%) &rarr; <code>resampled=False</code>, every shard visited
+        exactly once per epoch.</div></div>
+    <div class="tile"><div class="lab">End artifact</div><div class="big">table &rarr; checkpoint</div>
+      <div class="cap">Not just a results row &mdash; a promoted, documented,
+        W&amp;B-Artifact-backed checkpoint for future fine-tuning.</div></div>
+  </div>
+</section>
+
+<section class="part" id="live-status">
+  <div class="callout">
+    <div class="lab">Latest deployment · 2026-09-18 · static snapshot</div>
+    <p>This update supersedes the older job and loader details below. DINO job
+      <code>5796919</code> and LeJEPA job <code>5796922</code> are submitted independently,
+      both pending on priority with 24-hour limits. Job <code>5796510</code> was replaced.
+      Four spawned CPU processes now decode and augment images in deterministic order;
+      DataLoader workers are zero. ZIP handles stay open; 7z archives extract once with
+      a 16 GiB combined archive/extraction budget. Each objective uses a separate cache,
+      and evaluations share a lock. All 19 targeted tests pass. Every 100 new steps logs
+      measured throughput; end-to-end speedup and revised ETA await GPU execution.</p>
+  </div>
+  <div class="part-head"><span class="n">LIVE</span><div><h2>Full-stream run status</h2></div></div>
+  <div class="callout good">
+    <div class="lab">Checked 2026-09-18</div>
+    <p><strong>LeJEPA did not crash.</strong> The W&amp;B run showing 199 steps is the completed
+      200-step pilot. The full LeJEPA run has not started yet. The active job is the resumable
+      full DINO run; there are no full-stream jobs waiting in the Slurm queue.</p>
+  </div>
+  <div class="phases">
+    <div class="phase"><span class="id">1</span><span class="pill done">done</span>
+      <div class="t">DINO pilot</div>
+      <div class="d">200 steps, used to validate the portal stream and measure throughput.</div></div>
+    <div class="phase"><span class="id">2</span><span class="pill done">done</span>
+      <div class="t">LeJEPA pilot</div>
+      <div class="d">200 steps, completed successfully. Its W&amp;B state is <code>finished</code>
+        because the pilot process exited normally; it is not evidence of a completed 3-epoch run.</div></div>
+    <div class="phase"><span class="id">3</span><span class="pill now">now</span>
+      <div class="t">Full DINO</div>
+      <div class="d">Continuation <code>5796510</code> is queued and will resume from
+        <code>last.ckpt</code>,
+        configured for 113,064 optimizer steps (3 passes over the 506-archive manifest).
+        It is the first continuation that will load the optimized ZIP reader and one-worker
+        prefetch path. Each six-hour allocation checkpoints near walltime and resubmits itself.</div></div>
+    <div class="phase"><span class="id">4</span><span class="pill next">next</span>
+      <div class="t">Full LeJEPA</div>
+      <div class="d">Starts only after full DINO and its evaluation complete. No
+        <code>full_lejepa</code> directory or full LeJEPA log exists yet.</div></div>
+  </div>
+
+  <h3>What is actually stored</h3>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>item</th><th>current state</th></tr></thead>
+      <tbody>
+        <tr><td>Portal manifest</td><td><strong>Complete:</strong> 506/506 archives indexed, 4,823,974 image members, about 1.75 TiB declared archive bytes.</td></tr>
+        <tr><td>ZIP contents</td><td><strong>Not fully copied:</strong> only the active two-archive working set is cached locally (about 7.1 GiB at the last check).</td></tr>
+        <tr><td>Full DINO checkpoint</td><td><code>last.ckpt</code> plus periodic checkpoints and <code>ema_backbone.pt</code> are present; the cursor resumes the stream.</td></tr>
+        <tr><td>Full LeJEPA checkpoint</td><td>Not applicable yet; only the LeJEPA pilot checkpoint exists.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>How the portal dataloader works</h3>
+  <div class="prose">
+    <p>The job uses <code>GASTRONET_SOURCE=portal_zip</code>, not a local full-corpus copy.
+      The 91&nbsp;MB manifest stores the fixed archive list, sizes, IDs, and image-member names;
+      it does not store the image bytes. For each epoch the loader deterministically shuffles
+      the 506 archives and the members inside each archive, downloads the current archive plus
+      a prefetched next archive, and reads image members directly from the ZIP.</p>
+    <p>The cache has a 16&nbsp;GiB budget and an exclusive lock. At most two archives are reserved:
+      four compressed members are read at a time, four decoder threads convert them to RGB, the
+      transform creates the SSL views, and batches of 128 go to the GPU. Once an archive is
+      exhausted its ZIP is deleted. Thus the run uses a sliding two-archive cache rather than
+      storing 1.75&nbsp;TiB locally.</p>
+    <p>The optimized loader uses exactly one non-persistent DataLoader worker. This prepares one
+      batch ahead while the GPU trains, but a fresh worker each epoch inherits the parent's
+      committed cursor; multiple or persistent workers remain prohibited because they would
+      duplicate the iterable stream or retain stale progress. Download prefetch and four-thread
+      image decoding still happen inside that single stream. After every successful optimizer
+      step, the parent cursor records the epoch and batch. The
+      checkpoint also stores the manifest fingerprint and RNG state, so a walltime resubmission
+      continues from the last committed batch without changing sample order or repeating a
+      completed batch.</p>
+  </div>
+
+  <div class="callout">
+    <div class="lab">Optimization deployed; measurement pending</div>
+    <p>The original portal-ZIP path averaged only 4.6% GPU utilization and about 0.08
+      iterations/sec. Profiling found that every image reopened its multi-gigabyte ZIP and
+      reparsed a roughly 10k-entry central directory. On a cached production archive, reading
+      32 members took 2.59 seconds this way versus 0.073 seconds with one persistent archive
+      handle (35&times; faster for this stage). The next continuation keeps each ZIP open and
+      overlaps one prepared batch with GPU compute. Tests preserve exact archive coverage,
+      deterministic cursor resume, and checkpoint equivalence. End-to-end improvement will be
+      measured on job <code>5796510</code>; CPU DINO augmentation and the 13 remaining 7z
+      archives are the next likely targets.</p>
+  </div>
+</section>
+
+<section class="part" id="decisions">
+  <div class="part-head"><span class="n">DECISIONS</span><div><h2>What was asked, and why</h2></div></div>
+  <div class="prose">
+    <p>Two things were investigated before committing to an approach, rather than assumed.</p>
+  </div>
+
+  <h3>Multi-GPU (<code>--gres=gpu:2</code> or <code>:4</code>) &mdash; investigated, not pursued yet</h3>
+  <div class="decision">
+    <div class="lab">Finding</div>
+    <p>The data loader is already DDP-safe (<code>nodesplitter=wds.split_by_node</code>,
+      <code>workersplitter=wds.split_by_worker</code>, <code>gastronet.py:208-209</code>), and
+      <code>SSLModule</code> accesses <code>self.backbone</code>/<code>self.head</code> directly
+      with no <code>.module</code> indirection issues. But two real correctness traps exist and
+      are unsolved today:</p>
+    <ul class="tight">
+      <li><strong>DINO's <code>update_center()</code></strong> batch-means the teacher output
+        <em>locally</em>. Under DDP, each rank would silently drift to a different centering
+        value with no <code>dist.all_reduce</code> anywhere in the code &mdash; a silent bug,
+        not a crash.</li>
+      <li><strong>LeJEPA's SIGReg term</strong> is a batch-distribution statistic. 4 ranks at
+        bs=128 each is 4 independent noisy estimates, not one estimate on an effective bs=512
+        &mdash; changes what the regularizer does, not just its speed.</li>
+    </ul>
+    <p><strong>Decision: stay single-GPU.</strong> Remove the one free inefficiency
+      (grad checkpointing, below) first, measure, and only revisit DDP as its own sub-project
+      if throughput is still the bottleneck.</p>
+  </div>
+
+  <h3>GastroNet-5M EDA &mdash; deferred</h3>
+  <div class="decision">
+    <div class="lab">Finding</div>
+    <p>Only 69/506 zips are ingested locally right now (~669k of ~4.9M images). The reference
+      paper link provided was a presigned S3 URL that had already expired (5-minute TTL) by
+      fetch time.</p>
+    <p><strong>Decision: one complete EDA pass after the full ingest finishes</strong>, not a
+      partial pass now redone later. <code>pipeline/dq/checks.py</code> (corrupt %, phash
+      dup-cluster %, dimension/RGB histograms) is already written for this and unrun &mdash;
+      it becomes the base for a new artifact page once the corpus is fully in, folding in the
+      paper's documented quirks once a durable link is available.</p>
+  </div>
+</section>
+
+<section class="part" id="changes">
+  <div class="part-head"><span class="n">CHANGES</span><div><h2>Phase by phase</h2></div></div>
+
+  <div class="phases">
+    <div class="phase"><span class="id">A</span><span class="pill done">done</span>
+      <div class="t">SigLIP-2 off the active path (dormant, not deleted)</div>
+      <div class="d">Matrix scripts (<code>submit_ssl_matrix.sh</code>,
+        <code>submit_eval_chain.sh</code>) and defaults (<code>sbatch_*.sbatch</code>,
+        <code>config.yaml</code>, <code>pretrain.py</code>) now default to
+        <code>imagenet</code>-only; <code>INIT="siglip2 imagenet"</code> still works if ever
+        needed. Backbone/weight-loading code, config lookups, and the 15 stale
+        <code>*siglip2*.json</code> results are left alone / archived, same pattern as the
+        existing unused <code>realcolon.py</code> / <code>edl.py</code> modules.</div></div>
+
+    <div class="phase"><span class="id">B</span><span class="pill next">next</span>
+      <div class="t">Exact full-corpus coverage</div>
+      <div class="d"><code>vlfz/data/gastronet.py::webdataset_loader</code> gets a
+        <code>resampled</code> param (default <code>false</code> via
+        <code>GASTRONET_RESAMPLED</code>). When off: <code>shardshuffle=True</code>, no
+        <code>.with_epoch()</code> cap &mdash; the loader exhausts naturally, so every shard is
+        seen exactly once per epoch. <code>resampled=True</code> stays available for anyone
+        re-running the original, comparable config.</div></div>
+
+    <div class="phase"><span class="id">C</span><span class="pill next">next</span>
+      <div class="t">Remove the free inefficiency: grad checkpointing on GPU</div>
+      <div class="d"><code>SSLModule.__init__</code> unconditionally enables activation
+        checkpointing whenever CUDA is available &mdash; a CPU-hang mitigation artifact, not a
+        GPU necessity at bs=128 on a 94GB H100. Becomes a config flag
+        (<code>GRAD_CKPT</code>, default on, full-corpus run sets it off); <code>batch_size</code>
+        becomes env-overridable too. <strong>A short timed smoke runs first</strong> to measure
+        real throughput before committing to an epoch budget &mdash; current speeds (3.79&nbsp;it/s
+        LeJEPA, 1.07&nbsp;it/s DINO) are a floor, not the answer.</div></div>
+
+    <div class="phase"><span class="id">D</span><span class="pill done">done</span>
+      <div class="t">Storage cleanup</div>
+      <div class="d">Deleted: the 3 crash-looped LR/LLRD sweep dirs (10.7&nbsp;GB, superseded by
+        this full-corpus re-run), <code>siglip2_runs/</code> (29&nbsp;GB, predates VLF_Zeiss),
+        and <code>hf_cache/</code> in full (39&nbsp;GB &mdash; shared cache, silently
+        re-downloads elsewhere on next use). Brings measured usage from ~108&nbsp;GB toward
+        ~30&nbsp;GB. <code>rm</code> doesn't need write quota, so this ran immediately &mdash;
+        but the LRZ<code>_</code>DSS06 quota showed zero response to two earlier real deletions,
+        so this is necessary hygiene, not a guaranteed unblock. The LRZ ticket is still the real
+        fix.</div></div>
+
+    <div class="phase"><span class="id">E</span><span class="pill blocked">blocked on quota</span>
+      <div class="t">Resume the full ingest</div>
+      <div class="d">The corrupt-zip crash fix (<code>22df058</code>, this session) is already
+        committed. Once writes to <code>pr74ze-dss-0001</code> succeed again:
+        <code>lrz/backfill_gastronet_full.sh</code> for the remaining 437 zips, order
+        ~15&ndash;20h, run detached. Expected final size: <strong>~68&nbsp;GB curated</strong>,
+        ~4.9M images.</div></div>
+
+    <div class="phase"><span class="id">F</span><span class="pill blocked">blocked on E</span>
+      <div class="t">Launch the 2-setting full-corpus SSL runs</div>
+      <div class="d"><code>OBJ={lejepa,dino} INIT=imagenet CORPUS=gastronet STAGE=full
+        GASTRONET_RESAMPLED=0 GRAD_CKPT=0 SSL_EPOCHS=&lt;measured-budget&gt; sbatch
+        lrz/sbatch_ssl_pretrain.sbatch</code> &mdash; self-resubmitting as today. Epoch count
+        decided after step C's throughput measurement against a wall-clock budget, not fixed in
+        advance; safe to raise later only on a <em>finished</em> (DONE-flagged) run, not
+        mid-resume.</div></div>
+
+    <div class="phase"><span class="id">G</span><span class="pill next">next</span>
+      <div class="t">Post-SSL eval + aggregate</div>
+      <div class="d">Unchanged machinery (<code>submit_eval_chain.sh</code>), naturally
+        narrower: 2 settings &times; 5 tasks = 10 post-SSL rows instead of 20.
+        <code>aggregate.py</code>/<code>pivot.py</code> need no code change &mdash; both are
+        fully data-driven off the results JSONs.</div></div>
+
+    <div class="phase"><span class="id">H</span><span class="pill blocked">deferred</span>
+      <div class="t">GastroNet-5M EDA</div>
+      <div class="d">Gated on E. Adapts the already-written <code>pipeline/dq/checks.py</code>
+        to the local WebDataset tier; new artifact page once the corpus is fully in.</div></div>
+  </div>
+</section>
+
+<section class="part" id="foundation">
+  <div class="part-head"><span class="n">I</span><div><span class="eyebrow">The actual goal</span>
+    <h2>Model selection &amp; checkpoint promotion</h2></div></div>
+  <div class="prose">
+    <p>Everything above exists to produce one thing: a checkpoint worth calling a foundation
+      model. That reframes what matters about it &mdash; from "one row in a comparison table"
+      to "a durable asset something else depends on."</p>
+  </div>
+
+  <h4>Selection metric</h4>
+  <div class="prose">
+    <p>A model meant for further fine-tuning is judged on transferable representation quality,
+      not frozen-feature calibration &mdash; fine-tuning recalibrates anyway. Primary criterion:
+      <strong>mean post-SSL balanced-accuracy across the 4 classification tasks + Dice on
+      <code>hkv_seg</code></strong>. ECE/NLL and the <code>collapse/effective_rank</code> W&amp;B
+      curve are a <strong>gate, not the ranking</strong> &mdash; a candidate that regressed vs.
+      its own pre-SSL baseline, or whose effective rank collapsed (this benchmark's own
+      precedent: the earlier LeJEPA/ImageNet run lost 19&ndash;62 accuracy points on the subset;
+      watch for a repeat on the full corpus), is disqualified regardless of any other number.
+      With SigLIP-2 dropped this is a straight DINO-vs-LeJEPA call.</p>
+  </div>
+
+  <h4>Promotion, not just "keep the file"</h4>
+  <div class="prose">
+    <p><code>save_eval_backbone()</code> already writes <code>ema_backbone.pt</code> per setting,
+      but nothing marks one as <em>the</em> model or protects it from the per-setting cleanup
+      logic that auto-deletes resume checkpoints on finished runs. Once both settings finish:
+      copy the winner to a separate <code>$OUT_ROOT/foundation_model/ema_backbone.pt</code>, with
+      a <code>CARD.json</code> recording which setting won, <strong>both</strong> settings' metric
+      values (so the decision stays auditable), corpus size, epoch/step count, git SHA, date.</p>
+  </div>
+
+  <div class="callout bad">
+    <div class="lab">Don't let it depend on LRZ scratch's reliability</div>
+    <p>Given the exact failure mode this week (LRZ_DSS06 stuck at its quota cap; a crash loop
+      that nearly clobbered checkpoints), the one file everything downstream depends on
+      shouldn't live only on that storage. W&amp;B is already wired up
+      (<code>_wandb_logger</code>) &mdash; log the winning <code>ema_backbone.pt</code> as a
+      versioned <strong>W&amp;B Artifact</strong> at promotion time. A few lines
+      (<code>wandb.Artifact(...).add_file(...)</code>), and the checkpoint becomes durable and
+      decoupled from LRZ storage entirely.</p>
+  </div>
+  <p class="prose" style="font-size:.88rem;color:var(--muted);max-width:706px">Downstream
+    fine-tuning tasks themselves are explicitly out of scope for this plan &mdash; it stops at a
+    promoted, documented, durably-stored checkpoint ready for that next phase.</p>
+</section>
+
+<section class="part" id="files">
+  <div class="part-head"><span class="n">FILES</span><div><h2>Critical files</h2></div></div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>file</th><th>role in this plan</th></tr></thead>
+      <tbody>
+        <tr><td><code>lrz/submit_ssl_matrix.sh</code><br><code>lrz/submit_eval_chain.sh</code></td>
+          <td>Matrix enumeration &mdash; narrowed to <code>imagenet</code>-only, override via <code>INITS=</code>.</td></tr>
+        <tr><td><code>lrz/sbatch_ssl_pretrain.sbatch</code><br><code>lrz/sbatch_eval.sbatch</code></td>
+          <td>Default <code>INIT</code> env var, unchanged self-resubmit / <code>EXIT</code>-trap logic.</td></tr>
+        <tr><td><code>vlfz/ssl/pretrain.py</code></td>
+          <td><code>INIT</code> default; new <code>grad_checkpointing</code> config wiring; where the promotion step attaches after both settings finish.</td></tr>
+        <tr><td><code>vlfz/data/gastronet.py::webdataset_loader</code></td>
+          <td>New <code>resampled</code> branch for exact shard coverage.</td></tr>
+        <tr><td><code>config.yaml</code></td>
+          <td><code>gastronet_resampled</code>, <code>grad_checkpointing</code>, <code>batch_size</code> env templating.</td></tr>
+        <tr><td><code>tests/test_backbone_parity.py</code><br><code>tests/smoke_ssl.sh</code></td>
+          <td>Narrowed init loops &mdash; also drops the <code>HF_TOKEN</code> dependency from CI smokes.</td></tr>
+        <tr><td><code>pipeline/ingest/portal_to_wds.py</code></td>
+          <td>Corrupt-zip skip fix (<code>22df058</code>), already committed &mdash; what makes the 437-zip backfill safe to run unattended.</td></tr>
+        <tr><td><code>pipeline/dq/checks.py</code></td>
+          <td>Reference for the deferred EDA phase.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="part" id="verify">
+  <div class="part-head"><span class="n">VERIFY</span><div><h2>How each phase is checked</h2></div></div>
+  <div class="prose">
+    <ul>
+      <li><code>python -m pytest -q</code> green after the init-loop narrowing.</li>
+      <li>A <code>GRAD_CKPT=0</code> timed smoke shows it/s &ge; the current measured floor
+        (3.79 LeJEPA / 1.07 DINO) before trusting it for the epoch-budget calculation.</li>
+      <li><code>resampled=False</code> smoke: one full local pass over the 69 currently-ingested
+        shards, every shard visited exactly once (a log line per shard boundary), no worker
+        hangs.</li>
+      <li>Storage: a live write test (<code>dd</code>) re-checked after cleanup and after any
+        LRZ-side fix &mdash; never assumed from the dashboard banner alone (the 2026-09-14
+        lesson).</li>
+      <li>Post full-ingest: <code>_ingested.txt</code> line count == 506 (or 506 minus a
+        documented <code>_failed.txt</code> remainder); curated tier ~68&nbsp;GB.</li>
+      <li>Final SSL artifacts: both <code>ema_backbone.pt</code> report the expected
+        <code>gstep</code>; W&amp;B shows both runs with <code>loss</code> /
+        <code>collapse/effective_rank</code> curves, no non-finite-loss skips.</li>
+      <li><strong>Foundation model</strong>: <code>foundation_model/ema_backbone.pt</code> +
+        <code>CARD.json</code> exist, the card's winning metrics match <code>report.md</code>,
+        and the same file resolves as a W&amp;B Artifact from a clean shell &mdash; i.e. it
+        survives LRZ storage being unavailable.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Written 2026-09-16 &middot; repo <code>VLF_Zeiss</code> &middot; branch
+    <code>feat/calibration-eval-pipeline</code> &middot; full plan history in
+    <code>docs/PLAN.md</code> (this page covers the active addendum only).
+    Storage cleanup (Phase D) is done; everything else through Phase E is
+    blocked on the LRZ_DSS06 quota incident clearing.
+  </div>
+</footer>
+
+</body></html>

@@ -27,7 +27,7 @@ _IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp")
 def resolve_source(cfg, override: str | None = None) -> str:
     src = override or os.environ.get("GASTRONET_SOURCE") or str(
         getattr(cfg.ssl, "gastronet_source", "local_webdataset"))
-    if src not in ("local_zip", "local_webdataset", "s3_webdataset"):
+    if src not in ("local_zip", "local_webdataset", "s3_webdataset", "portal_zip"):
         raise ValueError(f"bad gastronet source: {src}")
     return src
 
@@ -234,12 +234,28 @@ def main():
     ap.add_argument("--build-manifest", action="store_true")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--source", default=None,
-                    choices=["local_zip", "local_webdataset", "s3_webdataset"])
+                    choices=["local_zip", "local_webdataset", "s3_webdataset", "portal_zip"])
     ap.add_argument("--inspect", action="store_true")
     ap.add_argument("--smoke", action="store_true", help="iterate a few wds batches")
     a = ap.parse_args()
     cfg = load_cfg(a.config)
     src = resolve_source(cfg, a.source)
+    if src == 'portal_zip':
+        from .portal import PortalClient
+        client = PortalClient(str(cfg.ssl.portal_json))
+        print(f"[portal_zip] {len(client.spec['files'])} archives")
+        if a.smoke:
+            from types import SimpleNamespace
+            from ..ssl.pretrain import _make_loader
+            from .transforms import multicrop_collate, two_view_transform
+            args = SimpleNamespace(source=src, corpus='gastronet', stage='smoke', max_images=20)
+            dl, _ = _make_loader(cfg, args, two_view_transform(cfg), multicrop_collate,
+                                 bs=4, nw=0, dev='cpu')
+            for i, batch in enumerate(dl):
+                print(f"batch {i}: {tuple(batch['views'][0].shape)}")
+                if i == 4:
+                    break
+        return
 
     if a.build_manifest:
         build_manifest(cfg, force=a.force)

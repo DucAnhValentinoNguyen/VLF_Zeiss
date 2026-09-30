@@ -1,0 +1,1974 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>VLF_Zeiss Calibration Benchmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  :root{
+    --bg:#f5f7f8; --surface:#ffffff; --surface-2:#eef1f3;
+    --ink:#14181b; --muted:#59626c; --line:#e0e4e8; --line-strong:#c9d0d6;
+    --accent:#0d7a84; --accent-soft:#0d7a8422; --slate:#6b7a86;
+    --good:#1f9d57; --warn:#b0761b; --bad:#c0453c;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+      --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+      --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+      --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1012; --surface:#16191d; --surface-2:#1d2226;
+    --ink:#e7e9ec; --muted:#98a2ad; --line:#262c31; --line-strong:#333c44;
+    --accent:#45b7c2; --accent-soft:#45b7c229; --slate:#8b99a4;
+    --good:#37c07f; --warn:#d6a344; --bad:#e26a61;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); font-size:17px; line-height:1.66;
+    font-feature-settings:"liga" 1;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding:0 24px}
+  .prose{max-width:706px}
+  .prose p, .prose ul, .prose ol{margin:0 0 1.05rem}
+  .prose ul,.prose ol{padding-left:1.25rem}
+  .prose li{margin:.3rem 0}
+  a{color:var(--accent); text-underline-offset:2px}
+  strong{font-weight:600}
+  h1,h2,h3,h4{font-family:var(--sans); font-weight:600; line-height:1.25; text-wrap:balance; margin:0}
+  h2{font-size:1.5rem; margin:0 0 .2rem}
+  h3{font-size:1.12rem; margin:2.2rem 0 .5rem}
+  h4{font-size:.98rem; margin:1.4rem 0 .4rem; font-weight:600}
+  .eyebrow{font-family:var(--mono); font-size:.72rem; font-weight:500;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--accent)}
+  code{font-family:var(--mono); font-size:.86em; background:var(--surface-2);
+    padding:.1em .36em; border-radius:3px; border:1px solid var(--line)}
+  pre{margin:0}
+  pre code{display:block; background:none; border:0; padding:0; font-size:inherit}
+
+  /* ---- masthead ---- */
+  header.top{border-bottom:1px solid var(--line); background:var(--surface)}
+  .top .wrap{padding-top:34px; padding-bottom:30px}
+  .kicker{font-family:var(--mono); font-size:.74rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px}
+  h1{font-size:2.05rem; letter-spacing:-.012em; margin-bottom:.5rem}
+  .sub{font-size:1.05rem; color:var(--muted); max-width:640px; margin:0}
+  .meta{display:flex; flex-wrap:wrap; gap:8px 10px; margin-top:20px;
+    font-family:var(--mono); font-size:.74rem}
+  .meta span{border:1px solid var(--line); border-radius:100px;
+    padding:4px 10px; color:var(--muted); background:var(--bg)}
+  .meta b{color:var(--ink); font-weight:500}
+
+  /* ---- toc ---- */
+  nav.toc{position:sticky; top:0; z-index:5; background:var(--bg);
+    border-bottom:1px solid var(--line)}
+  nav.toc .wrap{display:flex; flex-wrap:wrap; gap:2px 4px; padding-top:9px; padding-bottom:9px}
+  nav.toc a{font-family:var(--mono); font-size:.73rem; color:var(--muted);
+    text-decoration:none; padding:4px 9px; border-radius:5px; white-space:nowrap}
+  nav.toc a:hover{color:var(--ink); background:var(--surface-2)}
+
+  /* ---- part sections ---- */
+  section.part{padding:52px 0 8px; border-top:1px solid var(--line)}
+  section.part:first-of-type{border-top:0}
+  .part-head{display:flex; align-items:baseline; gap:14px; margin-bottom:26px}
+  .part-head .n{font-family:var(--mono); font-size:.8rem; color:var(--accent);
+    letter-spacing:.1em; padding-top:3px}
+
+  /* ---- callout tiles ---- */
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:14px; margin:22px 0}
+  .tile{background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    padding:16px 16px 14px}
+  .tile .lab{font-family:var(--mono); font-size:.68rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted)}
+  .tile .big{font-family:var(--sans); font-weight:600; font-size:1.7rem;
+    letter-spacing:-.01em; margin:.28em 0 .12em; font-variant-numeric:tabular-nums}
+  .tile .cap{font-size:.86rem; color:var(--muted); line-height:1.45}
+
+  /* ---- status list ---- */
+  .phases{border:1px solid var(--line); border-radius:9px; overflow:hidden;
+    background:var(--surface); margin:20px 0}
+  .phase{display:grid; grid-template-columns:112px 1fr auto; gap:14px;
+    padding:12px 16px; border-top:1px solid var(--line); align-items:baseline}
+  .phase:first-child{border-top:0}
+  .phase .id{font-family:var(--mono); font-size:.8rem; color:var(--muted)}
+  .phase .desc{font-size:.94rem}
+  .phase .desc b{font-family:var(--sans); font-weight:600; font-size:.9rem}
+  .pill{font-family:var(--mono); font-size:.68rem; letter-spacing:.06em;
+    text-transform:uppercase; padding:3px 9px; border-radius:100px; white-space:nowrap;
+    border:1px solid transparent; align-self:center}
+  .pill.done{color:var(--good); border-color:color-mix(in srgb,var(--good) 40%,transparent);
+    background:color-mix(in srgb,var(--good) 12%,transparent)}
+  .pill.run{color:var(--accent); border-color:color-mix(in srgb,var(--accent) 40%,transparent);
+    background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .pill.block{color:var(--muted); border-color:var(--line-strong); background:var(--surface-2)}
+  .pill.partial{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 40%,transparent);
+    background:color-mix(in srgb,var(--warn) 12%,transparent)}
+
+  /* ---- tables ---- */
+  .tbl-scroll{overflow-x:auto; margin:20px 0; border:1px solid var(--line);
+    border-radius:9px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-family:var(--sans); font-size:.83rem}
+  th,td{padding:9px 13px; text-align:left; white-space:nowrap;
+    border-bottom:1px solid var(--line)}
+  thead th{font-weight:600; font-size:.72rem; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--muted); background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums}
+  td.best{color:var(--good); font-weight:600}
+  .flag{color:var(--warn); font-family:var(--mono); font-size:.9em}
+  caption{caption-side:bottom; text-align:left; color:var(--muted);
+    font-family:var(--sans); font-size:.78rem; padding:10px 4px 0}
+
+  /* ---- chart ---- */
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:26px; margin:24px 0}
+  @media (max-width:640px){.charts{grid-template-columns:1fr}}
+  .chart h4{margin:0 0 2px}
+  .chart .note{font-size:.8rem; color:var(--muted); margin:0 0 8px}
+  .chart svg{width:100%; height:auto; display:block}
+  /* SVG presentation attributes don't accept var(); style marks via CSS classes */
+  .chart .g-grid{stroke:var(--line-strong); stroke-width:1}
+  .chart .g-axis{stroke:var(--line-strong); stroke-width:1}
+  .chart .t-tick,.chart .t-cat{fill:var(--muted)}
+  .chart .t-tick{font-family:var(--mono); font-size:8px}
+  .chart .t-cat{font-family:var(--sans); font-size:8.5px}
+  .chart .t-val{fill:var(--ink); font-family:var(--mono); font-size:7.5px}
+  .chart .bar-in{fill:var(--accent)}
+  .chart .bar-sg{fill:var(--slate)}
+  .legend{display:flex; gap:16px; font-family:var(--mono); font-size:.72rem;
+    color:var(--muted); margin-top:6px}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:2px;
+    margin-right:5px; vertical-align:baseline}
+
+  /* ---- code blocks ---- */
+  .code{background:var(--surface-2); border:1px solid var(--line);
+    border-left:3px solid var(--accent); border-radius:0 7px 7px 0;
+    overflow-x:auto; margin:14px 0; padding:13px 15px;
+    font-family:var(--mono); font-size:13px; line-height:1.62}
+  .code .ln{color:var(--muted); user-select:none; display:inline-block;
+    width:2.4em; text-align:right; margin-right:1.1em; opacity:.7}
+  .code .c{color:var(--muted); font-style:italic}
+  .ann{list-style:none; padding:0; margin:10px 0 4px; max-width:706px}
+  .ann li{display:grid; grid-template-columns:74px 1fr; gap:12px; padding:5px 0;
+    border-top:1px solid var(--line); font-size:.9rem; line-height:1.5}
+  .ann li:first-child{border-top:0}
+  .ann .r{font-family:var(--mono); font-size:.76rem; color:var(--accent); padding-top:2px}
+
+  /* ---- file disclosure ---- */
+  .layer{margin:26px 0}
+  .layer > p.intro{max-width:706px; color:var(--muted); font-size:.94rem}
+  details.file{border:1px solid var(--line); border-radius:9px; background:var(--surface);
+    margin:10px 0; overflow:hidden}
+  details.file[open]{background:var(--surface)}
+  details.file > summary{list-style:none; cursor:pointer; padding:13px 16px;
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px}
+  details.file > summary::-webkit-details-marker{display:none}
+  details.file > summary::before{content:"▸"; color:var(--accent); font-family:var(--mono);
+    margin-right:2px}
+  details.file[open] > summary::before{content:"▾"}
+  summary .path{font-family:var(--mono); font-size:.86rem; font-weight:500; color:var(--ink)}
+  summary .loc{font-family:var(--mono); font-size:.72rem; color:var(--muted)}
+  summary .role{font-size:.88rem; color:var(--muted); flex-basis:100%; padding-left:20px}
+  .file .body{padding:2px 16px 16px; border-top:1px solid var(--line)}
+  .file .body > p{max-width:706px; font-size:.94rem}
+
+  .callout{border:1px solid var(--line); border-left:3px solid var(--warn);
+    background:var(--surface); border-radius:0 7px 7px 0; padding:14px 16px; margin:18px 0;
+    max-width:706px}
+  .callout.bug{border-left-color:var(--bad)}
+  .callout .lab{font-family:var(--mono); font-size:.7rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--warn); margin-bottom:5px}
+  .callout.bug .lab{color:var(--bad)}
+  .callout p{margin:.4rem 0; font-size:.92rem}
+
+  footer{border-top:1px solid var(--line); margin-top:60px; background:var(--surface)}
+  footer .wrap{padding:26px 24px 40px; color:var(--muted); font-size:.82rem;
+    font-family:var(--sans)}
+  footer code{font-size:.82em}
+
+  ::selection{background:var(--accent-soft)}
+  @media (max-width:560px){
+    body{font-size:16px}
+    .phase{grid-template-columns:1fr auto}
+    .phase .id{grid-column:1/-1}
+    .ann li{grid-template-columns:1fr}
+    .ann .r{padding-top:0}
+  }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Technical Report · Internal</div>
+    <h1>VLF_Zeiss Calibration Benchmark</h1>
+    <p class="sub">Does in-domain self-supervised pretraining on GastroNet-5M improve the
+      <em>calibration</em> of frozen vision-foundation features on HyperKvasir, measured
+      zero-shot? The final before/after result for all 4 settings, what is built, and how every
+      code file works.</p>
+    <div class="meta">
+      <span>date <b>2026-09-12</b></span>
+      <span>branch <b>feat/calibration-eval-pipeline</b></span>
+      <span>HEAD <b>65dd3d3</b></span>
+      <span>package <b>vlfz/ · 3,244 LOC</b></span>
+      <span>commits <b>28</b> &middot; <a href="https://wandb.ai/models-ludwig-maximilian-university-of-munich/vlf-zeiss" target="_blank" rel="noopener">W&amp;B project</a></span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#p1">1 · What is built</a>
+    <a href="#p2">2 · Results</a>
+    <a href="#p3">3 · Architecture</a>
+    <a href="#p4">4 · Code, file by file</a>
+    <a href="#p5">5 · The LR = 0 bug</a>
+    <a href="#p6">6 · Timeline</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ================= PART 1 ================= -->
+<section class="part" id="p1">
+  <div class="part-head"><span class="n">PART 1</span>
+    <div><span class="eyebrow">Achievements</span><h2>What is built</h2></div></div>
+
+  <div class="prose">
+    <p>The experiment is a clean before/after loop. For each of four model settings
+      &mdash; <strong>{LeJEPA, DINO&nbsp;v1} &times; {SigLIP-2 ViT-B/16 init, ImageNet ViT-B/16 init}</strong>
+      &mdash; measure zero-shot calibration on HyperKvasir, then repeat after in-domain
+      self-supervised pretraining on GastroNet-5M, and report the change in ECE and NLL.
+      &ldquo;Zero-shot&rdquo; means a <strong>weighted k-NN on frozen features</strong>
+      (DINO protocol, k&nbsp;=&nbsp;20, &tau;&nbsp;=&nbsp;0.07); these backbones are vision-only,
+      so there is no text head.</p>
+    <p>Five downstream tasks share one stratified image-level split of HyperKvasir:
+      <code>hkv_findings</code> (20-way pathology finding), <code>hkv_category</code> (4-way),
+      <code>hkv_tract</code> (upper vs lower GI), <code>hkv_pathology</code> (pathological vs other),
+      and <code>hkv_seg</code> &mdash; zero-shot polyp segmentation by dense patch-feature
+      k-NN label transfer, no training.</p>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="lab">Independent codebase</div>
+      <div class="big">3,244</div>
+      <div class="cap">lines across <code>vlfz/</code>, its own uv venv, zero runtime
+        dependency on the predecessor repo.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Pre-SSL baseline</div>
+      <div class="big">10 / 10</div>
+      <div class="cap">result JSONs written &mdash; 2 inits &times; 5 tasks &mdash; aggregated
+        into one table. Phase 4 complete.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">GastroNet-5M ingested</div>
+      <div class="big">581,518</div>
+      <div class="cap">images curated to a 224&nbsp;px WebDataset tier on LRZ &mdash;
+        60 shards, 8.1&nbsp;GB, 155&nbsp;min (60 of 506 portal zips).</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Verification</div>
+      <div class="big">17 + smokes</div>
+      <div class="cap">unit tests green; GPU smoke exercised the Lightning path on all
+        four objective&times;init combos.</div>
+    </div>
+  </div>
+
+  <h3>Component status</h3>
+  <div class="phases">
+    <div class="phase"><span class="id">Phase 0</span>
+      <span class="desc"><b>Scaffold + config.</b> Package skeleton, OmegaConf config,
+        LRZ job env, provenance.</span><span class="pill done">done</span></div>
+    <div class="phase"><span class="id">Phase 1</span>
+      <span class="desc"><b>Backbone + weight ingestion.</b> ViT-B/16 factory; exact
+        torchvision&rarr;timm conversion (parity cosine &gt; 0.999); SigLIP-2 via timm tag.</span>
+      <span class="pill done">done</span></div>
+    <div class="phase"><span class="id">Phase 2</span>
+      <span class="desc"><b>Calibration + k-NN.</b> ECE (equal-width + adaptive), NLL, Brier,
+        LBFGS temperature scaling; weighted k-NN emitting probs + logits + vote mass.</span>
+      <span class="pill done">done</span></div>
+    <div class="phase"><span class="id">Phase 3</span>
+      <span class="desc"><b>Eval dataset.</b> REAL-Colon dropped (946&nbsp;GB, no room);
+        replaced by the HyperKvasir loader + 5 tasks + shared split.</span>
+      <span class="pill done">done</span></div>
+    <div class="phase"><span class="id">Phase 4</span>
+      <span class="desc"><b>Pre-SSL evaluation.</b> Frozen-init zero-shot on all 5 tasks,
+        both inits &mdash; the baseline table in Part&nbsp;2.</span>
+      <span class="pill done">done</span></div>
+    <div class="phase"><span class="id">Phase 5</span>
+      <span class="desc"><b>SSL on GastroNet-5M.</b> All 4 settings trained &mdash; 3 clean
+        epochs each (14,061 steps), verified by checkpoint <code>gstep</code>. Every run logged
+        to Weights &amp; Biases with full hyperparameters, loss/LR curves and timing.</span>
+      <span class="pill done">4 / 4</span></div>
+    <div class="phase"><span class="id">Phase 6</span>
+      <span class="desc"><b>Post-SSL evaluation + delta.</b> All 4 settings evaluated on a
+        perceptual-hash-deduplicated split (leakage mitigation, Part&nbsp;2) &mdash; the final
+        16-row before/after table.</span>
+      <span class="pill done">4 / 4</span></div>
+    <div class="phase"><span class="id">Phase 7</span>
+      <span class="desc"><b>AWS data lake &mdash; retired.</b> Terraform S3 + IAM + Glue/Athena +
+        budgets were built and applied; ephemeral-EC2 ingest failed repeatedly on a fresh-account
+        restriction, so the approach was dropped in favour of LRZ-direct ingest, which is the
+        permanent path. The AWS infra is being torn down (not load-bearing for any current result).</span>
+      <span class="pill block">retired</span></div>
+  </div>
+
+  <div class="prose">
+    <h4>The data-pipeline story (Phase 7) &mdash; tried, then dropped</h4>
+    <p>GastroNet-5M is ~1&nbsp;TB of PNGs in 506 gated portal zips &mdash; it does not fit LRZ's
+      ~90&nbsp;GB of writable quota. The original plan was an S3 data lake (versioned bucket, IAM
+      roles, a Glue/Athena catalog, a monthly cost budget) fed by a throwaway EC2 instance in the
+      same region, all declared in Terraform. The infrastructure code is complete and was applied,
+      but the EC2 ingest step failed repeatedly &mdash; every instance vanished ~20&nbsp;minutes
+      after boot, a restriction on the fresh AWS account we could not clear in time. <strong>We do
+      not use this path.</strong> The permanent solution is <strong>curating directly on
+      LRZ</strong>: <code>portal_to_wds.py</code> streams one zip at a time, resizes / re-encodes /
+      de-duplicates it into WebDataset <code>.tar</code> shards, then deletes the zip &mdash; so
+      the full raw corpus never has to land at once, and the curated tier (~50&nbsp;GB) fits
+      comfortably on LRZ storage. That is the path that actually produced the tier the SSL runs
+      consume; the AWS S3 lake is dead infrastructure being torn down, not an active dependency.</p>
+
+    <h4>&ldquo;Ingest&rdquo; and &ldquo;curate&rdquo;</h4>
+    <p>Two stages of turning the source data into something trainable.</p>
+    <ul>
+      <li><strong>Ingest</strong> &mdash; pull the bytes out of the source system into ours. The
+        source is the Cortex portal, where GastroNet-5M sits as 506 ZIPs (&le;10k PNGs each)
+        behind an authenticated API. Per file: <code>POST
+        /api/provided_file/&lt;id&gt;/download_url/</code> &rarr; a 10-minute presigned URL &rarr;
+        stream the ZIP to scratch (Range-resume if it expires) &rarr; hand it to curation &rarr;
+        delete it.</li>
+      <li><strong>Curate</strong> &mdash; transform those raw files into a clean, uniform,
+        training-ready dataset. For every image: decode (drop if corrupt) &rarr; resize the short
+        side to 224&nbsp;px (downscale only &mdash; the model input size) &rarr; re-encode
+        JPEG&nbsp;q87 RGB &rarr; drop perceptual-hash duplicates (endoscopy video frames repeat
+        heavily) &rarr; pack the survivors into <code>.tar</code> shards of ~10k images (the
+        WebDataset format: sequential reads, no per-file <code>open()</code> cost). Result for
+        the subset: <strong>581,518 kept, 268 dropped, 60 shards, 8.1&nbsp;GB, 155&nbsp;min</strong>
+        &mdash; the raw ZIPs were roughly 8&times; larger.</li>
+    </ul>
+
+    <h4>Why 581k images, not 4.8M</h4>
+    <p>Two independent reasons, and neither is a storage limit:</p>
+    <ul>
+      <li><strong>Only 60 of 506 zips are ingested so far</strong> &mdash; a deliberate
+        time-vs-completeness call for the deadline. 60 zips took 155&nbsp;min; all 506 would be
+        ~22&nbsp;h. The backfill is a one-command resume (<code>portal_to_wds.py</code> skips
+        zips already in <code>_ingested.txt</code>) and can run any time; the full curated tier
+        (~50&ndash;65&nbsp;GB) fits LRZ fine.</li>
+      <li><strong>The experiment never trains on the full corpus anyway.</strong>
+        <code>config.yaml</code> sets <code>ssl.subset_images: 700000</code> &mdash; the design
+        is a <em>short in-domain adaptation</em> from a strong pretrained init (hence the
+        LLRD&nbsp;0.75 layer-wise decay), not pretraining from scratch. Full-corpus
+        single-GPU SSL is 10&ndash;40 GPU-days <em>per run</em> &times; 4 runs &mdash;
+        infeasible in the time budget. The current runs see 581,518&nbsp;&times;&nbsp;3&nbsp;epochs
+        &asymp; 1.74M image-presentations, squarely in the intended range. &ldquo;-5M&rdquo; in
+        the name is the <em>available pool</em>; the run samples from it.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= PART 2 ================= -->
+<section class="part" id="p2">
+  <div class="part-head"><span class="n">PART 2</span>
+    <div><span class="eyebrow">Evaluation</span><h2>Results &mdash; before vs after SSL</h2></div></div>
+
+  <div class="prose">
+    <p>These are the &ldquo;before&rdquo; numbers: each backbone frozen at its public
+      initialisation, <em>no</em> in-domain SSL yet. Weighted k-NN over the
+      <code>reference</code> split (60%), temperature fit on <code>cal</code> (15%),
+      metrics on the held-out <code>query</code> split (~2,650 images per classification task;
+      900 query masks for segmentation). <code>T</code> rows are after scalar temperature
+      scaling. The point of the baseline is the contrast it will draw with the post-SSL
+      table &mdash; absolute k-NN ECE is only loosely a posterior.</p>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <h4>Query accuracy &nbsp;<span class="note">(segmentation: Dice) &middot; higher is better</span></h4>
+      <svg viewBox="0 0 344 236" role="img" aria-label="Grouped bar chart of query accuracy per task, ImageNet init versus SigLIP-2 init. ImageNet is higher on all five tasks.">
+        <g class="g-grid">
+          <line x1="141" y1="12" x2="141" y2="210" opacity=".45"/>
+          <line x1="204" y1="12" x2="204" y2="210" opacity=".45"/>
+          <line x1="267" y1="12" x2="267" y2="210" opacity=".45"/>
+          <line x1="330" y1="12" x2="330" y2="210" opacity=".45"/>
+        </g>
+        <line class="g-axis" x1="78" y1="12" x2="78" y2="210"/>
+        <g class="t-tick" text-anchor="middle">
+          <text x="78" y="224">0</text><text x="141" y="224">.25</text>
+          <text x="204" y="224">.5</text><text x="267" y="224">.75</text><text x="330" y="224">1</text>
+        </g>
+        <g class="t-cat" text-anchor="end">
+          <text x="72" y="27">findings</text>
+          <text x="72" y="68">category</text>
+          <text x="72" y="109">tract</text>
+          <text x="72" y="150">pathology</text>
+          <text x="72" y="191">seg · Dice</text>
+        </g>
+        <g class="bar-in">
+          <rect x="78" y="16" width="213.1" height="11" rx="1"/>
+          <rect x="78" y="57" width="236.9" height="11" rx="1"/>
+          <rect x="78" y="98" width="250.7" height="11" rx="1"/>
+          <rect x="78" y="139" width="237.3" height="11" rx="1"/>
+          <rect x="78" y="180" width="168.0" height="11" rx="1"/>
+        </g>
+        <g class="bar-sg">
+          <rect x="78" y="30" width="192.2" height="11" rx="1"/>
+          <rect x="78" y="71" width="225.9" height="11" rx="1"/>
+          <rect x="78" y="112" width="248.8" height="11" rx="1"/>
+          <rect x="78" y="153" width="228.9" height="11" rx="1"/>
+          <rect x="78" y="194" width="79.2" height="11" rx="1"/>
+        </g>
+        <g class="t-val" text-anchor="start">
+          <text x="294" y="25">.846</text><text x="317" y="66">.940</text>
+          <text x="317" y="107">.995</text><text x="317" y="148">.942</text><text x="250" y="189">.667</text>
+          <text x="273" y="39">.763</text><text x="308" y="80">.897</text>
+          <text x="317" y="121">.987</text><text x="311" y="162">.908</text><text x="161" y="203">.314</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>ImageNet init</span>
+        <span><i style="background:var(--slate)"></i>SigLIP-2 init</span>
+      </div>
+    </div>
+
+    <div class="chart">
+      <h4>NLL &nbsp;<span class="note">(pre-temperature) &middot; lower is better</span></h4>
+      <svg viewBox="0 0 344 236" role="img" aria-label="Grouped bar chart of pre-temperature negative log-likelihood per task, ImageNet init versus SigLIP-2 init. ImageNet is lower on all five tasks.">
+        <g class="g-grid">
+          <line x1="141" y1="12" x2="141" y2="210" opacity=".45"/>
+          <line x1="204" y1="12" x2="204" y2="210" opacity=".45"/>
+          <line x1="267" y1="12" x2="267" y2="210" opacity=".45"/>
+          <line x1="330" y1="12" x2="330" y2="210" opacity=".45"/>
+        </g>
+        <line class="g-axis" x1="78" y1="12" x2="78" y2="210"/>
+        <g class="t-tick" text-anchor="middle">
+          <text x="78" y="224">0</text><text x="141" y="224">.25</text>
+          <text x="204" y="224">.5</text><text x="267" y="224">.75</text><text x="330" y="224">1.0</text>
+        </g>
+        <g class="t-cat" text-anchor="end">
+          <text x="72" y="27">findings</text>
+          <text x="72" y="68">category</text>
+          <text x="72" y="109">tract</text>
+          <text x="72" y="150">pathology</text>
+          <text x="72" y="191">seg · px</text>
+        </g>
+        <g class="bar-in">
+          <rect x="78" y="16" width="140.3" height="11" rx="1"/>
+          <rect x="78" y="57" width="44.6" height="11" rx="1"/>
+          <rect x="78" y="98" width="5.9" height="11" rx="1"/>
+          <rect x="78" y="139" width="38.3" height="11" rx="1"/>
+          <rect x="78" y="180" width="60.0" height="11" rx="1"/>
+        </g>
+        <g class="bar-sg">
+          <rect x="78" y="30" width="233.4" height="11" rx="1"/>
+          <rect x="78" y="71" width="80.4" height="11" rx="1"/>
+          <rect x="78" y="112" width="13.1" height="11" rx="1"/>
+          <rect x="78" y="153" width="64.5" height="11" rx="1"/>
+          <rect x="78" y="194" width="87.9" height="11" rx="1"/>
+        </g>
+        <g class="t-val" text-anchor="start">
+          <text x="221" y="25">.557</text><text x="125" y="66">.177</text>
+          <text x="87" y="107">.023</text><text x="120" y="148">.152</text><text x="141" y="189">.238</text>
+          <text x="300" y="39">.926</text><text x="161" y="80">.319</text>
+          <text x="95" y="121">.052</text><text x="146" y="162">.256</text><text x="169" y="203">.349</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>ImageNet init</span>
+        <span><i style="background:var(--slate)"></i>SigLIP-2 init</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead>
+        <tr><th>task</th><th>classes</th><th>init</th><th>T</th>
+          <th>acc</th><th>bal-acc</th><th>AUROC</th>
+          <th>ECE&nbsp;ew</th><th>ECE&nbsp;ew&nbsp;·T</th><th>NLL</th><th>NLL&nbsp;·T</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>hkv_tract</td><td class="num">2</td><td>imagenet <span class="flag">&#9888;</span></td>
+          <td class="num">1.38</td><td class="num">.9947</td><td class="num">.9955</td><td class="num">.9990</td>
+          <td class="num">.0023</td><td class="num">.0064</td><td class="num best">.0233</td><td class="num">.0229</td></tr>
+        <tr><td>hkv_tract</td><td class="num">2</td><td>siglip2 <span class="flag">&#9888;</span></td>
+          <td class="num">1.04</td><td class="num">.9872</td><td class="num">.9862</td><td class="num">.9977</td>
+          <td class="num">.0061</td><td class="num">.0038</td><td class="num">.0519</td><td class="num">.0515</td></tr>
+        <tr><td>hkv_pathology</td><td class="num">2</td><td>imagenet</td>
+          <td class="num">1.33</td><td class="num best">.9416</td><td class="num">.9013</td><td class="num">.9826</td>
+          <td class="num">.0170</td><td class="num">.0342</td><td class="num best">.1522</td><td class="num">.1581</td></tr>
+        <tr><td>hkv_pathology</td><td class="num">2</td><td>siglip2</td>
+          <td class="num">0.91</td><td class="num">.9084</td><td class="num">.8512</td><td class="num">.9565</td>
+          <td class="num">.0338</td><td class="num">.0260</td><td class="num">.2555</td><td class="num">.2547</td></tr>
+        <tr><td>hkv_category</td><td class="num">4</td><td>imagenet</td>
+          <td class="num">1.19</td><td class="num best">.9397</td><td class="num">.9434</td><td class="num">.9924</td>
+          <td class="num">.0258</td><td class="num">.0381</td><td class="num best">.1772</td><td class="num">.1822</td></tr>
+        <tr><td>hkv_category</td><td class="num">4</td><td>siglip2</td>
+          <td class="num">0.82</td><td class="num">.8968</td><td class="num">.9000</td><td class="num">.9802</td>
+          <td class="num">.0589</td><td class="num">.0330</td><td class="num">.3185</td><td class="num">.3099</td></tr>
+        <tr><td>hkv_findings</td><td class="num">20</td><td>imagenet</td>
+          <td class="num">1.61</td><td class="num best">.8455</td><td class="num">.6148</td><td class="num">.9474</td>
+          <td class="num">.0480</td><td class="num">.1114</td><td class="num best">.5567</td><td class="num">.5547</td></tr>
+        <tr><td>hkv_findings</td><td class="num">20</td><td>siglip2</td>
+          <td class="num">1.34</td><td class="num">.7628</td><td class="num">.5027</td><td class="num">.9232</td>
+          <td class="num">.0843</td><td class="num">.1438</td><td class="num">.9259</td><td class="num">.9122</td></tr>
+        <tr><td>hkv_seg</td><td class="num">2&nbsp;px</td><td>imagenet</td>
+          <td class="num">&ndash;</td><td class="num best">Dice&nbsp;.667</td><td class="num">mIoU&nbsp;.541</td><td class="num">&ndash;</td>
+          <td class="num">.0093</td><td class="num">&ndash;</td><td class="num best">.2384</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num">2&nbsp;px</td><td>siglip2</td>
+          <td class="num">&ndash;</td><td class="num">Dice&nbsp;.314</td><td class="num">mIoU&nbsp;.214</td><td class="num">&ndash;</td>
+          <td class="num">.0140</td><td class="num">&ndash;</td><td class="num">.3486</td><td class="num">&ndash;</td></tr>
+      </tbody>
+      <caption>Weighted k-NN, k = 20, &tau; = 0.07, ImageNet-normalised 224&nbsp;px features
+        (768-d, LayerNorm of the mean patch token). <span class="flag">&#9888;</span> = accuracy &gt; 0.98,
+        flagged for leakage inspection. <span style="color:var(--good)">Green</span> = better of the
+        two inits on that metric.</caption>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h4>What the baseline says</h4>
+    <ul>
+      <li><strong>ImageNet init beats SigLIP-2 on every task</strong>, on both discrimination
+        (accuracy, NLL) and mostly on calibration. This is the opposite of the pre-registered
+        sanity guess &mdash; the web-scale contrastive model was expected to transfer better.
+        For endoscopy k-NN it does not: supervised ImageNet features are more linearly separable
+        here, and their patch tokens carry far more local structure (segmentation Dice
+        0.67 vs 0.31).</li>
+      <li><strong><code>hkv_tract</code> is flagged &mdash; confirmed structural, not
+        leakage.</strong> A dedicated audit (<code>hkv_tract_audit.py</code>) checked the
+        finding ontology directly: <strong>23 of 23</strong> HyperKvasir findings are
+        tract-exclusive (each finding occurs in upper-GI or lower-GI images only, never both),
+        so upper-vs-lower-GI is recoverable from coarse image content almost by construction.
+        Re-run on 2026-09-13 against the deduplicated split, independent of the accuracy number
+        itself. Upper vs lower GI sits at 99.5% accuracy / 0.999 AUROC &mdash; near-trivially
+        separable from global image appearance, and with an image-level split (HyperKvasir has
+        no procedure IDs) near-duplicate frames from one procedure can still straddle
+        <code>reference</code> and
+        <code>query</code>. Treated as an interpretation caveat, recorded in every JSON.</li>
+      <li><strong>Temperature scaling is not uniformly helpful.</strong> For ImageNet, T&nbsp;&gt;&nbsp;1
+        and post-T ECE sometimes rises (<code>findings</code>: .048&nbsp;&rarr;&nbsp;.111): the
+        k-NN &ldquo;logits&rdquo; (log of normalised vote mass) are not true logits, and a single
+        scalar fit on a 15% cal split can over-correct. For SigLIP-2 on <code>category</code> /
+        <code>pathology</code>, T&nbsp;&lt;&nbsp;1 and post-T ECE improves. The pre-vs-post-SSL
+        <em>delta</em> is the intended read, not the absolute value.</li>
+      <li><strong>The 20-way findings task is imbalanced.</strong> Balanced accuracy ~0.61
+        (imagenet) / ~0.50 (siglip2) against raw accuracy ~0.85 &mdash; strong on common
+        findings, weak on rare ones, AUROC still ~0.95.</li>
+    </ul>
+  </div>
+
+  <h3>Post-SSL results &mdash; all 4 settings, final</h3>
+  <div class="prose">
+    <p>Every setting: 3 epochs of its objective on the 581k-image curated tier (verified by
+      checkpoint <code>gstep&nbsp;14061</code> &mdash; exactly 3 epochs, no more, no less), then
+      the same zero-shot k-NN evaluation. <strong>&Delta; = post-SSL &minus; pre-SSL</strong>;
+      negative &Delta; on ECE / NLL means SSL made the features better-calibrated.
+      <span style="color:var(--good)">Green</span> = SSL helped that metric,
+      <span style="color:var(--bad)">red</span> = SSL hurt it,
+      <span style="color:var(--muted)">grey</span> = within run-to-run noise (&le;&nbsp;.002).</p>
+    <p><strong>ECE ew</strong> = Expected Calibration Error with 15 equal-width confidence bins:
+      the population-weighted mean of |mean&nbsp;confidence &minus; accuracy| per bin (lower =
+      the model's confidence is honest). <strong>ECE ew&nbsp;·T</strong> and
+      <strong>NLL&nbsp;·T</strong> are the same metrics recomputed <em>after</em> temperature
+      scaling. Segmentation has no <code>·T</code> variant (the dense patch k-NN is not
+      temperature-scaled).</p>
+    <p><strong>This table is on the leakage-mitigated split.</strong> HyperKvasir has no
+      patient/procedure id, so near-duplicate frames from one procedure could straddle
+      <code>reference</code> and <code>query</code>. Every <code>cal</code>/<code>query</code>
+      image within 6 bits of perceptual-hash distance from any <code>reference</code> image was
+      dropped before scoring &mdash; <strong>274 of 1,592 cal images (17%) and 453 of 2,654 query
+      images (17%)</strong>. <code>hkv_tract</code> stayed flagged even after dedup
+      (99.4% / 98.5% accuracy) &mdash; upper-vs-lower-GI is genuinely near-trivial from global
+      image appearance, not just a split artefact.</p>
+  </div>
+
+  <h4>DINO&nbsp;v1 / ImageNet init &nbsp;<span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; eff. rank 51.7, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;·T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;·T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0155</td><td class="num best">&minus;.0162</td><td class="num best">&minus;.045</td><td class="num best">&minus;.076</td><td class="num best">+.021</td><td class="num best">+.035</td><td class="num best">+.009</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0095</td><td class="num best">&minus;.0032</td><td class="num" style="color:var(--bad)">+.024</td><td class="num" style="color:var(--muted)">+.004</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num" style="color:var(--muted)">&minus;.004</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num" style="color:var(--muted)">+.0003</td><td class="num" style="color:var(--bad)">+.0080</td><td class="num" style="color:var(--bad)">+.023</td><td class="num" style="color:var(--bad)">+.012</td><td class="num" style="color:var(--muted)">&minus;.003</td><td class="num" style="color:var(--bad)">&minus;.008</td><td class="num" style="color:var(--muted)">&minus;.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--muted)">+.0007</td><td class="num best">&minus;.0020</td><td class="num best">&minus;.008</td><td class="num best">&minus;.007</td><td class="num" style="color:var(--muted)">+.001</td><td class="num" style="color:var(--muted)">+.001</td><td class="num" style="color:var(--muted)">+.001</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0035</td><td class="num">&ndash;</td><td class="num best">&minus;.026</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.061</td></tr>
+      </tbody>
+      <caption>DINO&nbsp;v1 / GastroNet-5M / ImageNet init.</caption>
+    </table>
+  </div>
+
+  <h4>DINO&nbsp;v1 / SigLIP-2 init &nbsp;<span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; eff. rank 46.7, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;·T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;·T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0646</td><td class="num best">&minus;.0687</td><td class="num best">&minus;.413</td><td class="num best">&minus;.438</td><td class="num best">+.092</td><td class="num best">+.144</td><td class="num best">+.015</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0492</td><td class="num best">&minus;.0103</td><td class="num best">&minus;.153</td><td class="num best">&minus;.152</td><td class="num best">+.047</td><td class="num best">+.055</td><td class="num best">+.014</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num best">&minus;.0247</td><td class="num" style="color:var(--muted)">&minus;.0014</td><td class="num best">&minus;.111</td><td class="num best">&minus;.111</td><td class="num best">+.037</td><td class="num best">+.053</td><td class="num best">+.032</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--muted)">&minus;.0028</td><td class="num" style="color:var(--muted)">&minus;.0003</td><td class="num best">&minus;.038</td><td class="num best">&minus;.039</td><td class="num best">+.010</td><td class="num best">+.010</td><td class="num" style="color:var(--muted)">+.002</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0035</td><td class="num">&ndash;</td><td class="num best">&minus;.131</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.402</td></tr>
+      </tbody>
+      <caption>DINO&nbsp;v1 / GastroNet-5M / SigLIP-2 init. The single largest gain in the whole
+        table: segmentation Dice <strong>+0.40</strong>.</caption>
+    </table>
+  </div>
+
+  <h4>LeJEPA / SigLIP-2 init &nbsp;<span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; eff. rank 25.8, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;·T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;·T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num best">&minus;.0521</td><td class="num best">&minus;.0724</td><td class="num" style="color:var(--bad)">+.126</td><td class="num best">&minus;.000</td><td class="num" style="color:var(--bad)">&minus;.058</td><td class="num" style="color:var(--bad)">&minus;.014</td><td class="num" style="color:var(--bad)">&minus;.036</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num best">&minus;.0374</td><td class="num best">&minus;.0149</td><td class="num" style="color:var(--bad)">+.068</td><td class="num" style="color:var(--bad)">+.068</td><td class="num" style="color:var(--bad)">&minus;.037</td><td class="num" style="color:var(--bad)">&minus;.025</td><td class="num" style="color:var(--muted)">&minus;.009</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num best">&minus;.0189</td><td class="num best">&minus;.0053</td><td class="num" style="color:var(--bad)">+.054</td><td class="num" style="color:var(--bad)">+.046</td><td class="num" style="color:var(--bad)">&minus;.030</td><td class="num" style="color:var(--bad)">&minus;.051</td><td class="num" style="color:var(--bad)">&minus;.023</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--bad)">+.0087</td><td class="num" style="color:var(--muted)">+.0034</td><td class="num" style="color:var(--bad)">+.072</td><td class="num" style="color:var(--bad)">+.072</td><td class="num" style="color:var(--bad)">&minus;.030</td><td class="num" style="color:var(--bad)">&minus;.039</td><td class="num" style="color:var(--muted)">&minus;.006</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--bad)">+.0222</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">+.138</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num best">+.128</td></tr>
+      </tbody>
+      <caption>LeJEPA / GastroNet-5M / SigLIP-2 init. ECE improves, at an accuracy/NLL cost &mdash;
+        the trade described below.</caption>
+    </table>
+  </div>
+
+  <h4>LeJEPA / ImageNet init &nbsp;<span class="flag" style="font-size:.8em">&#9888; SEVERE REGRESSION</span> &nbsp;<span style="font-weight:400;color:var(--muted);font-family:var(--serif)">&mdash; eff. rank 33.9, no collapse</span></h4>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>task</th><th>&Delta; ECE&nbsp;ew</th><th>&Delta; ECE&nbsp;ew&nbsp;·T</th>
+        <th>&Delta; NLL</th><th>&Delta; NLL&nbsp;·T</th><th>&Delta; accuracy</th>
+        <th>&Delta; bal-acc</th><th>&Delta; AUROC</th><th>&Delta; Dice</th></tr></thead>
+      <tbody>
+        <tr><td>hkv_findings</td><td class="num" style="color:var(--bad)">+.367</td><td class="num best">&minus;.072</td><td class="num" style="color:var(--bad)">+6.91</td><td class="num" style="color:var(--bad)">+2.07</td><td class="num" style="color:var(--bad)">&minus;.625</td><td class="num" style="color:var(--bad)">&minus;.447</td><td class="num" style="color:var(--bad)">&minus;.273</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_category</td><td class="num" style="color:var(--bad)">+.183</td><td class="num" style="color:var(--bad)">+.116</td><td class="num" style="color:var(--bad)">+1.94</td><td class="num" style="color:var(--bad)">+.750</td><td class="num" style="color:var(--bad)">&minus;.278</td><td class="num" style="color:var(--bad)">&minus;.423</td><td class="num" style="color:var(--bad)">&minus;.234</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_pathology</td><td class="num" style="color:var(--bad)">+.147</td><td class="num" style="color:var(--bad)">+.127</td><td class="num" style="color:var(--bad)">+1.30</td><td class="num" style="color:var(--bad)">+.450</td><td class="num" style="color:var(--bad)">&minus;.188</td><td class="num" style="color:var(--bad)">&minus;.343</td><td class="num" style="color:var(--bad)">&minus;.410</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_tract <span class="flag">&#9888;</span></td><td class="num" style="color:var(--bad)">+.075</td><td class="num" style="color:var(--bad)">+.023</td><td class="num" style="color:var(--bad)">+.592</td><td class="num" style="color:var(--bad)">+.529</td><td class="num" style="color:var(--bad)">&minus;.292</td><td class="num" style="color:var(--bad)">&minus;.364</td><td class="num" style="color:var(--bad)">&minus;.238</td><td class="num">&ndash;</td></tr>
+        <tr><td>hkv_seg</td><td class="num" style="color:var(--muted)">+.008</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">+.095</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num">&ndash;</td><td class="num" style="color:var(--bad)">&minus;.136</td></tr>
+      </tbody>
+      <caption>LeJEPA / GastroNet-5M / ImageNet init. Raw NLL &Delta; shown to 2 decimals &mdash;
+        the magnitudes are large, not a formatting artefact.</caption>
+    </table>
+  </div>
+
+  <div class="callout bug">
+    <div class="lab">Flag &mdash; LeJEPA on the ImageNet init is a genuine, severe failure mode</div>
+    <p>Query accuracy on <code>hkv_findings</code> collapsed from <strong>82.4% pre-SSL to
+      19.9% post-SSL</strong> (AUROC 0.95&nbsp;&rarr;&nbsp;0.67); every classification task lost
+      19&ndash;62 accuracy points. This was checked against a pipeline bug and ruled out: the
+      pre-SSL baselines in the same evaluation sweep are normal, the other three settings in the
+      same sweep are normal, and SSL training itself shows no instability &mdash; loss fell
+      smoothly (0.044&nbsp;&rarr;&nbsp;0.033), no non-finite-loss skips, effective rank stayed at
+      33.9 (healthy; classic collapse reads ~1). AUROC staying above 0.5 confirms the features
+      still carry <em>some</em> signal &mdash; k-NN is just badly miscalibrated to the point of
+      being nearly useless at the decision threshold.</p>
+    <p>Reading: LeJEPA's SIGReg term aggressively reshapes the batch toward an isotropic Gaussian.
+      Applied full-backbone to an already highly class-structured <em>supervised</em> ImageNet
+      embedding, it appears to overwrite that structure faster than the light LLRD&nbsp;0.75
+      layer decay can protect it &mdash; the representation stays spread out (rank) but loses its
+      linear/k-NN separability. Notably this is <em>worse</em>, not better, than the earlier
+      accidental ~4-epoch run of the same setting (that one only lost 7&ndash;12 accuracy
+      points) &mdash; a clean, monotonic 3-epoch cosine schedule drifted further from the
+      supervised init than a run whose LR schedule was inadvertently interrupted and restarted.
+      That is itself a data point: the damage accumulates with clean optimisation, it is not an
+      artefact of the earlier bug.</p>
+  </div>
+
+  <div class="prose">
+    <h4>The story across all four settings</h4>
+    <ul>
+      <li><strong>DINO is the reliable adapter.</strong> It improved calibration and/or
+        segmentation from <em>both</em> initialisations, with no accuracy cost anywhere.
+        From SigLIP-2 the gains are large (ECE &minus;0.01 to &minus;0.06, seg Dice
+        <strong>+0.40</strong>); from the already-strong ImageNet init they are smaller but still
+        net positive (findings improves on every axis at once).</li>
+      <li><strong>LeJEPA is powerful but init-sensitive.</strong> From SigLIP-2 (room to improve)
+        it trades accuracy for markedly better calibration and a strong segmentation gain
+        (+0.13 Dice). From ImageNet (already excellent) it is destructive &mdash; the aggressive
+        SIGReg regulariser has nothing to gain and a great deal to lose.</li>
+      <li><strong><code>hkv_findings</code> and segmentation are where SSL matters most</strong>
+        for the three well-behaved settings; the near-saturated <code>hkv_tract</code> /
+        <code>hkv_pathology</code> tasks barely move either way.</li>
+      <li><strong>Practical takeaway:</strong> if the deployment init is a strong supervised
+        backbone, prefer a gentle self-distillation objective (DINO) for in-domain adaptation;
+        reserve an aggressive distributional regulariser (LeJEPA) for weaker / less
+        task-aligned starting points, or pair it with a much smaller LR / shorter schedule /
+        stronger LLRD when starting from a strong supervised init.</li>
+    </ul>
+  </div>
+
+  <h3>Compute &amp; storage</h3>
+  <div class="prose">
+    <p>Everything ran single-GPU (<code>--gres=gpu:1</code>) on LRZ's shared H100/A100 fleet;
+      every result JSON and W&amp;B run records the exact GPU model, VRAM, node and partition.</p>
+  </div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>setting</th><th>GPU</th><th>node</th><th>wall time</th><th>speed</th></tr></thead>
+      <tbody>
+        <tr><td>LeJEPA / SigLIP-2</td><td>A100&#8209;SXM4&#8209;80GB</td><td>a100-002</td><td class="num">1h 30m</td><td class="num">2.65&nbsp;it/s</td></tr>
+        <tr><td>DINO / ImageNet</td><td>H100&nbsp;94GB</td><td>h100-013</td><td class="num">3h 43m</td><td class="num">1.07&nbsp;it/s</td></tr>
+        <tr><td>DINO / SigLIP-2</td><td>H100&nbsp;94GB</td><td>h100-021</td><td class="num">2h 54m<span class="flag" title="resumed after a disk-quota failure">&#9888;</span></td><td class="num">1.09&nbsp;it/s</td></tr>
+        <tr><td>LeJEPA / ImageNet</td><td>H100&nbsp;94GB</td><td>h100-010</td><td class="num">1h 04m</td><td class="num">3.79&nbsp;it/s</td></tr>
+      </tbody>
+      <caption>All single-GPU, batch 128, bf16, gradient checkpointing. Speed varies node-to-node
+        by up to 3&times; on this shared cluster (a degraded node, <code>lrz-hgx-h100-003</code>,
+        ran at 0.23&nbsp;it/s and is now excluded &mdash; see Part&nbsp;5).</caption>
+    </table>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="lab">Total run storage</div>
+      <div class="big">~12.7&nbsp;GB</div>
+      <div class="cap">GastroNet tier 8.1&nbsp;GB &middot; staged HyperKvasir 3.7&nbsp;GB &middot;
+        4 checkpoints 1.3&nbsp;GB (0.33&nbsp;GB each, resident) &middot; feature cache 0.6&nbsp;GB.
+        Peak during training: +~3&nbsp;GB per active run (auto-cleaned on completion).</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Home-quota incident</div>
+      <div class="big">2&times;</div>
+      <div class="cap">SIGKILLed a checkpoint write (<code>OSError 28</code>) before outputs
+        moved to <code>$MCMLSCRATCH</code> and post-<code>DONE</code> cleanup was added.
+        Root-caused and fixed, not just retried.</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Eval sweep, before / after a fix</div>
+      <div class="big">7h &rarr; 12m</div>
+      <div class="cap">An oversized <code>--time=3h</code> request (jobs actually take ~3&ndash;5
+        min) left 6 eval jobs starved of backfill priority for 7 hours; trimming the time/CPU/mem
+        request let all 6 complete within 12 minutes of submission.</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================= PART 3 ================= -->
+<section class="part" id="p3">
+  <div class="part-head"><span class="n">PART 3</span>
+    <div><span class="eyebrow">Architecture</span><h2>Which file does which task</h2></div></div>
+
+  <div class="prose">
+    <p>One importable package, <code>vlfz/</code>, split into five layers, plus <code>lrz/</code>
+      (SLURM orchestration) and <code>pipeline/</code> (the AWS data pipeline). Two data paths
+      run through it: an <strong>SSL path</strong> (GastroNet-5M &rarr; pretrained backbone) and
+      an <strong>eval path</strong> (frozen backbone &rarr; k-NN &rarr; calibration &rarr; report).</p>
+  </div>
+
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>layer</th><th>file</th><th>responsibility</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="2">config</td><td><code>config.yaml</code></td><td>every knob: paths, backbone tags, SSL hyperparameters, eval k/&tau;, calibration bins. <code>${oc.env:VAR,default}</code> overrides.</td></tr>
+        <tr><td><code>vlfz/cfg.py</code></td><td><code>load_cfg</code> (resolve env interpolations), <code>provenance()</code> repro stamp, <code>set_seed()</code>.</td></tr>
+
+        <tr><td rowspan="5">models</td><td><code>models/vit_backbone.py</code></td><td><code>ViTBackbone</code> wrapper + <code>build_vit_b16(init, cfg, ckpt=)</code>. Uniform <code>.feature(x)</code> &rarr; 768-d, <code>.forward_tokens(x)</code> &rarr; (B,196,768).</td></tr>
+        <tr><td><code>models/convert_tv_vit.py</code></td><td>torchvision <code>vit_b_16</code> state-dict &rarr; timm layout (name map + fused QKV).</td></tr>
+        <tr><td><code>models/load_weights.py</code></td><td>the three weight sources + <code>strict_load</code> missing/unexpected reporter.</td></tr>
+        <tr><td><code>models/heads.py</code></td><td><code>Projector</code>/<code>Predictor</code> (LeJEPA); <code>DINOHead</code> (deepcopy-safe, no <code>weight_norm</code>).</td></tr>
+        <tr><td><code>models/ema.py</code></td><td><code>EMA</code> weight-average wrapper (the eval artefact) + <code>cosine_momentum</code>.</td></tr>
+
+        <tr><td rowspan="4">data</td><td><code>data/hyperkvasir.py</code></td><td>eval dataset: label table, disk scan, one global stratified split, 4 task builders, <code>canonical_classes</code>, seg pairs.</td></tr>
+        <tr><td><code>data/gastronet.py</code></td><td>SSL corpus: 3 read paths (<code>local_zip</code> / <code>local_webdataset</code> / <code>s3_webdataset</code>), manifest, subset sampler, WebDataset loader.</td></tr>
+        <tr><td><code>data/transforms.py</code></td><td>eval transform (224, ImageNet norm); LeJEPA two-view; DINO multi-crop. Endoscopy-safe: no flips, no grayscale.</td></tr>
+        <tr><td><code>data/registry.py</code></td><td><code>get_dataset("hyperkvasir")</code> uniform provider so <code>run_eval</code> is dataset-agnostic.</td></tr>
+
+        <tr><td rowspan="3">ssl</td><td><code>ssl/lejepa_lib.py</code></td><td>LeJEPA loss: <code>sigreg</code> (Epps-Pulley), <code>variance_hinge</code>, stop-grad <code>prediction_loss</code>, <code>effective_rank</code>.</td></tr>
+        <tr><td><code>ssl/dino_lib.py</code></td><td><code>dino_loss</code> (centering + sharpening CE), <code>update_center</code>, <code>cosine_lr</code>, <code>teacher_temp_at</code>.</td></tr>
+        <tr><td><code>ssl/pretrain.py</code></td><td>the Lightning entrypoint: <code>SSLModule</code> (manual optimization, both objectives, EMA/teacher bookkeeping), <code>GastroNetDataModule</code>, <code>_make_loader</code>, LLRD, checkpoint/resume.</td></tr>
+
+        <tr><td rowspan="6">eval</td><td><code>eval/features.py</code></td><td>cached frozen-feature extraction via <code>Trainer.predict()</code> &rarr; <code>feat_&lt;key&gt;.npz</code>.</td></tr>
+        <tr><td><code>eval/knn.py</code></td><td>weighted k-NN &rarr; <code>probs</code> / <code>logits</code> / <code>vote_mass</code>; k-sweep.</td></tr>
+        <tr><td><code>eval/calibration.py</code></td><td>ECE (equal-width + adaptive), NLL, Brier, <code>fit_temperature</code> (LBFGS), <code>calibration_report</code>.</td></tr>
+        <tr><td><code>eval/metrics.py</code></td><td>accuracy / balanced-acc / macro-F1 / AUROC + flat-row assembly.</td></tr>
+        <tr><td><code>eval/seg.py</code></td><td>zero-shot polyp segmentation: dense patch k-NN label transfer + pixel calibration.</td></tr>
+        <tr><td><code>eval/run_eval.py</code></td><td>orchestrator: (dataset &times; init &times; stage &times; task) &rarr; one results JSON.</td></tr>
+
+        <tr><td rowspan="2">report</td><td><code>report/aggregate.py</code></td><td>scan <code>results/*.json</code> &rarr; <code>long_results.csv</code> + post&minus;pre delta view.</td></tr>
+        <tr><td><code>report/pivot.py</code></td><td><code>long_results.csv</code> &rarr; markdown pivot with the leakage / SUSPECT flag.</td></tr>
+
+        <tr><td rowspan="3">lrz</td><td><code>lrz/job_env.sh</code></td><td>env exports, venv on PATH, scratch paths, <code>wait_for_gpu</code>, HF-token resolution.</td></tr>
+        <tr><td><code>lrz/sbatch_ssl_pretrain.sbatch</code></td><td>self-resubmitting single-GPU SSL, one variant per job (env <code>OBJ</code>/<code>INIT</code>/<code>STAGE</code>).</td></tr>
+        <tr><td><code>lrz/submit_*.sh</code></td><td><code>submit_ssl_matrix.sh</code> queues the 4 runs; <code>submit_eval_chain.sh</code> queues pre baselines + every SSL ckpt, then aggregate on the login node.</td></tr>
+
+        <tr><td rowspan="2">pipeline</td><td><code>pipeline/infra/*.tf</code></td><td>Terraform: S3 lake, IAM (ingest role + read-only user policy), Glue + Athena, ingest EC2, cost budget.</td></tr>
+        <tr><td><code>pipeline/ingest/portal_to_wds.py</code></td><td>portal &rarr; local curated WebDataset tier on LRZ (the path actually used). <code>portal_to_s3.py</code> = the abandoned cloud path.</td></tr>
+
+        <tr><td rowspan="3">dormant</td><td><code>data/realcolon.py</code>, <code>data/folds.py</code></td><td>REAL-Colon loader + grouped split &mdash; kept, unreferenced.</td></tr>
+        <tr><td><code>eval/edl.py</code></td><td>evidential deep learning &mdash; evaluated, dropped for a simpler single-protocol benchmark.</td></tr>
+        <tr><td><code>report/leakage_audit.py</code></td><td>pHash overlap SSL-corpus vs query &mdash; REAL-Colon-specific, unreferenced.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h4>SSL path</h4>
+    <p><code>submit_ssl_matrix.sh</code> queues four <code>sbatch_ssl_pretrain.sbatch</code> jobs
+      &rarr; each runs <code>python -m vlfz.ssl.pretrain --objective &hellip; --init &hellip;</code>
+      &rarr; <code>train()</code> builds a <code>GastroNetDataModule</code> (which calls
+      <code>_make_loader</code> &rarr; <code>gastronet.webdataset_loader</code> over the local
+      <code>.tar</code> tier) and an <code>SSLModule</code> (backbone from
+      <code>build_vit_b16</code> + LeJEPA or DINO heads) &rarr;
+      <code>pl.Trainer.fit</code> &rarr; every <code>ckpt_every_steps</code> and at each epoch end
+      <code>save_eval_backbone()</code> writes <code>ema_backbone.pt</code> &mdash; the one file
+      the eval path consumes.</p>
+    <h4>Eval path</h4>
+    <p><code>submit_eval_chain.sh</code> queues <code>sbatch_eval.sbatch</code> jobs &rarr; each
+      runs <code>python -m vlfz.eval.run_eval --init &hellip; --stage {pre|post} --task all</code>
+      &rarr; for each task and split (<code>reference</code>/<code>cal</code>/<code>query</code>),
+      <code>features.extract_features</code> runs the frozen backbone (cached to
+      <code>.npz</code>) &rarr; <code>knn.knn_vote</code> turns reference+query features into
+      probs+logits &rarr; <code>calibration.calibration_report</code> fits T on <code>cal</code>
+      and returns pre/post metrics &rarr; <code>metrics.context_metrics</code> adds
+      accuracy/AUROC &rarr; one JSON per (init, task). Then <code>report.aggregate</code> on the
+      login node scans every JSON into <code>long_results.csv</code>, <code>delta_results.csv</code>
+      and <code>report.md</code>.</p>
+  </div>
+</section>
+
+<!-- ================= PART 4 ================= -->
+<section class="part" id="p4">
+  <div class="part-head"><span class="n">PART 4</span>
+    <div><span class="eyebrow">Walkthrough</span><h2>Code, file by file</h2></div></div>
+
+  <div class="prose">
+    <p>Each file below: its job, then an annotated pass over the load-bearing lines
+      (<span class="ln" style="width:auto;margin:0">L&hellip;</span> = source line numbers at HEAD
+      <code>ccb8985</code>). The four flagship files are expanded; the rest open on click.</p>
+  </div>
+
+  <!-- ---- LAYER: config ---- -->
+  <div class="layer">
+    <h3>Layer · config &amp; provenance</h3>
+    <p class="intro">One YAML file holds every tunable; <code>cfg.py</code> loads it and stamps
+      each result with the git SHA, library versions and GPU so any number can be traced back
+      to the exact code that produced it.</p>
+
+    <details class="file">
+      <summary><span class="path">config.yaml</span><span class="loc">137 lines</span>
+        <span class="role">Central OmegaConf config &mdash; the single source of every hyperparameter.</span></summary>
+      <div class="body">
+        <p>Blocks: <code>paths</code> (data roots, output roots &mdash; all overridable by
+          <code>lrz/job_env.sh</code> via <code>${oc.env:VAR,default}</code>), <code>backbones</code>
+          (arch <code>vit_base_patch16_224</code>, the SigLIP-2 timm tags, ImageNet-norm mean/std
+          used for <em>all</em> feature extraction so there is one eval path), <code>ssl</code>
+          (objective, init, <code>batch_size 128</code>, <code>base_lr 1e-4</code>, cosine
+          <code>min_lr</code>, <code>llrd 0.75</code>, <code>grad_clip 3.0</code>,
+          <code>ema_base 0.9995</code>, <code>ckpt_every_steps 500</code>; a <code>smoke</code>
+          sub-block and a <code>full</code> sub-block whose <code>epochs</code> reads
+          <code>${oc.env:SSL_EPOCHS,8}</code>), <code>aug</code> (endoscopy-safe: rotation +
+          colour-jitter + blur, explicitly <em>no</em> flips / grayscale), <code>hyperkvasir</code>
+          (task list, <code>min_class 12</code> for the findings filter, split fractions
+          .60/.15/.25, seg support size 100), <code>eval</code> (<code>knn_k 20</code>,
+          <code>knn_tau 0.07</code>, k-sweep <code>[10,20,50,200]</code>), and
+          <code>calibration</code> (<code>n_bins 15</code>, adaptive 15, LBFGS
+          <code>temp_max_iter 100</code>).</p>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/cfg.py</span><span class="loc">100 LOC</span>
+        <span class="role">Config loader + reproducibility stamp.</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">18</span>def load_cfg(path=None):
+<span class="ln">21</span>    p = Path(path) if path else _DEFAULT_CFG
+<span class="ln">22</span>    cfg = OmegaConf.load(p)
+<span class="ln">24</span>    OmegaConf.resolve(cfg)   <span class="c"># ${oc.env:...} -&gt; plain str/int now</span>
+<span class="ln">25</span>    return cfg
+<span class="ln">60</span>def provenance(seed, **extra):
+<span class="ln">69</span>    out = {"seed": seed, "git_sha": git_sha(), "python": ...,
+<span class="ln">73</span>           "torch": _pkg_version("torch"), "timm": ..., "cuda": cuda,
+<span class="ln">80</span>           "slurm_job_id": os.environ.get("SLURM_JOB_ID",""), "timestamp": ...}
+<span class="ln">83</span>    out.update(extra); return out</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L18&ndash;25</span> Load YAML, then <code>OmegaConf.resolve</code>
+            eagerly so downstream code never sees an unresolved interpolation node &mdash; env
+            overrides are baked in at load time.</li>
+          <li><span class="r">L45&ndash;57</span> <code>git_sha()</code> shells
+            <code>git rev-parse --short HEAD</code>, returns <code>"n/a"</code> on any failure
+            (detached checkout, no git).</li>
+          <li><span class="r">L60&ndash;84</span> <code>provenance()</code> &mdash; the dict
+            embedded in every results JSON and every checkpoint: seed, SHA, Python + torch + timm
+            + sklearn versions, CUDA version, GPU name, SLURM job id, timestamp. <code>**extra</code>
+            lets callers add <code>init</code>/<code>objective</code>/<code>task</code>.</li>
+          <li><span class="r">L87&ndash;100</span> <code>set_seed()</code> seeds
+            <code>random</code>, <code>numpy</code>, <code>torch</code> + CUDA; torch import is
+            guarded so the helper works in a torch-free context.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: models ---- -->
+  <div class="layer">
+    <h3>Layer · models</h3>
+    <p class="intro">Every initialisation &mdash; SigLIP-2, ImageNet, or an SSL checkpoint &mdash;
+      is funnelled into one timm <code>VisionTransformer</code> and exposed through an identical
+      feature API, so the k-NN / calibration code never knows which backbone it holds.</p>
+
+    <details class="file" open>
+      <summary><span class="path">vlfz/models/vit_backbone.py</span><span class="loc">134 LOC</span>
+        <span class="role">Backbone-agnostic ViT-B/16 factory + uniform feature API. &#9733; flagship</span></summary>
+      <div class="body">
+        <p>The pooling choice is the crux: <code>feature(x)</code> is a non-parametric
+          LayerNorm of the <em>mean patch token</em>. That erases the difference between
+          SigLIP-2 (no CLS token, GAP head) and ImageNet ViT (CLS token) &mdash; the same
+          768-d vector for every init, and a stable SSL target.</p>
+        <div class="code"><pre><code><span class="ln">28</span>class ViTBackbone(nn.Module):
+<span class="ln">29</span>    def __init__(self, trunk, init):
+<span class="ln">33</span>        self.num_prefix = int(getattr(trunk, "num_prefix_tokens", 0))
+<span class="ln">34</span>        self.embed_dim  = int(getattr(trunk, "embed_dim", 768))
+<span class="ln">42</span>    def forward_tokens(self, x):
+<span class="ln">43</span>        t = self.trunk.forward_features(x)            <span class="c"># (B, T, C)</span>
+<span class="ln">46</span>        return t[:, self.num_prefix:, :]              <span class="c"># drop cls/reg prefix</span>
+<span class="ln">48</span>    def feature(self, x):
+<span class="ln">49</span>        patch  = self.forward_tokens(x)               <span class="c"># (B, N, C)</span>
+<span class="ln">50</span>        pooled = patch.mean(dim=1)                    <span class="c"># (B, C)</span>
+<span class="ln">51</span>        return F.layer_norm(pooled, (pooled.shape[-1],))   <span class="c"># non-affine</span></code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L33&ndash;34</span> Read <code>num_prefix_tokens</code> and
+            <code>embed_dim</code> from the trunk itself &mdash; 1 prefix token for ImageNet
+            (CLS), 0 for SigLIP-2-GAP.</li>
+          <li><span class="r">L42&ndash;46</span> <code>forward_tokens</code> returns the
+            post-trunk patch grid with the prefix sliced off &mdash; 196 tokens at 224&nbsp;px,
+            used directly by segmentation.</li>
+          <li><span class="r">L48&ndash;51</span> <code>feature</code> = mean-pool + non-affine
+            LayerNorm. No learned parameters, so it is identical pre- and post-SSL and across
+            inits.</li>
+          <li><span class="r">L57&ndash;66</span> <code>_timm_trunk</code> builds
+            <code>timm.create_model(&hellip;, num_classes=0, dynamic_img_size=True)</code> so
+            224&nbsp;px works regardless of the tag's native size.</li>
+          <li><span class="r">L89&ndash;96</span> <strong>imagenet path</strong>: fresh timm
+            arch, then overlay <code>torchvision_vit_b16_timm_sd()</code>; assert the load is
+            complete except the (dropped) classifier head.</li>
+          <li><span class="r">L97&ndash;114</span> <strong>siglip2 path</strong>: try the primary
+            timm tag, then the alt tag, then fall back to an open_clip SigLIP-2 whose
+            <code>.visual.trunk</code> is itself a timm ViT.</li>
+          <li><span class="r">L118&ndash;128</span> <strong>ckpt overlay</strong>: load
+            <code>ema_backbone</code> (or <code>backbone</code>) from an SSL checkpoint, strip a
+            leading <code>trunk.</code> if present, strict-load onto the trunk, and warn if the
+            checkpoint's recorded <code>init</code> disagrees with the requested one.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/models/convert_tv_vit.py</span><span class="loc">67 LOC</span>
+        <span class="role">torchvision &rarr; timm ViT-B/16 state-dict remap.</span></summary>
+      <div class="body">
+        <p>Both are the standard ViT-B/16, so the mapping is a pure rename plus one
+          concatenation. <code>tv_to_timm(tv_sd)</code>:</p>
+        <ul class="ann">
+          <li><span class="r">L23&ndash;28</span> Top-level renames:
+            <code>class_token&rarr;cls_token</code>,
+            <code>encoder.pos_embedding&rarr;pos_embed</code>,
+            <code>conv_proj.*&rarr;patch_embed.proj.*</code>,
+            <code>encoder.ln.*&rarr;norm.*</code>.</li>
+          <li><span class="r">L30&ndash;46</span> Per block (&times;12):
+            <code>ln_1/ln_2&rarr;norm1/norm2</code>; torchvision's fused
+            <code>in_proj_{weight,bias}</code> is already <code>[q;k;v]</code> row order &rarr;
+            copied straight to timm's <code>attn.qkv.*</code>;
+            <code>self_attention.out_proj&rarr;attn.proj</code>; the MLP <code>Sequential</code>
+            indices <code>0</code>/<code>3</code> &rarr; <code>mlp.fc1</code>/<code>mlp.fc2</code>.</li>
+          <li><span class="r">L61&ndash;67</span> <code>sanity_check</code> asserts the embed
+            tensors and all 12 <code>qkv</code> weights are present and that nothing but the
+            classifier head is left unmapped. Verified end-to-end by
+            <code>tests/test_backbone_parity.py</code> (cosine &gt; 0.999 vs a reference
+            torchvision forward).</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/models/load_weights.py</span><span class="loc">67 LOC</span>
+        <span class="role">Three weight sources + a strict-load reporter.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L16&ndash;35</span> <code>LoadReport</code> dataclass:
+            <code>missing</code> / <code>unexpected</code> key lists, an <code>ok()</code> test
+            with allow-lists (e.g. a missing <code>head.*</code> is fine), and a compact
+            <code>__str__</code>.</li>
+          <li><span class="r">L38&ndash;42</span> <code>strict_load</code> wraps
+            <code>load_state_dict(strict=False)</code>, prints the report, returns it &mdash;
+            callers assert on <code>.ok(&hellip;)</code>.</li>
+          <li><span class="r">L45&ndash;53</span> <code>torchvision_vit_b16_timm_sd</code>:
+            pull <code>ViT_B_16_Weights.IMAGENET1K_V1</code>, run <code>sanity_check</code> +
+            <code>tv_to_timm</code>.</li>
+          <li><span class="r">L56&ndash;67</span> <code>openclip_siglip2_trunk</code>: the
+            fallback &mdash; <code>open_clip.create_model(&hellip;).visual.trunk</code>, with a
+            hard error if that visual is not a timm ViT.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/models/heads.py</span><span class="loc">62 LOC</span>
+        <span class="role">SSL projection / prediction heads.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L14&ndash;27</span> <code>Projector</code> (LeJEPA): 3-layer
+            <code>Linear&ndash;BN&ndash;GELU</code> MLP, 768 &rarr; 512, mapping features into
+            the space where the SIGReg Gaussian test is run.</li>
+          <li><span class="r">L30&ndash;39</span> <code>Predictor</code> (LeJEPA): a light
+            <code>Linear&ndash;GELU&ndash;Linear</code>, no EMA target &mdash; it predicts one
+            view's embedding from the other's.</li>
+          <li><span class="r">L42&ndash;62</span> <code>DINOHead</code>: GELU MLP &rarr;
+            L2-normalise &rarr; linear with unit-norm rows. This is DINO's weight-normed last
+            layer with the magnitude frozen to 1, hand-written because
+            <code>torch.nn.utils.weight_norm</code> is not <code>deepcopy</code>-safe and the
+            teacher <em>is</em> a deepcopy.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/models/ema.py</span><span class="loc">43 LOC</span>
+        <span class="role">Weight-EMA wrapper &mdash; the artefact every eval reads.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L15&ndash;20</span> <code>EMA.__init__</code>:
+            <code>deepcopy(model).eval()</code>, freeze all parameters.</li>
+          <li><span class="r">L22&ndash;28</span> <code>update()</code>:
+            <code>pe.mul_(d).add_(pm, alpha=1&minus;d)</code> over parameters; buffers
+            (BN stats, positional tables) are <em>copied</em>, not averaged.</li>
+          <li><span class="r">L38&ndash;43</span> <code>cosine_momentum(step,total,base)</code>:
+            decay <code>base&rarr;1.0</code> on a cosine schedule &mdash; DINO's teacher
+            momentum (0.996&rarr;1). LeJEPA uses the fixed <code>ema_base 0.9995</code>.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: data ---- -->
+  <div class="layer">
+    <h3>Layer · data</h3>
+    <p class="intro">Two datasets: HyperKvasir (labelled, for evaluation) and GastroNet-5M
+      (unlabelled, for SSL). The eval loader also owns the task definitions and the one
+      split every task reuses.</p>
+
+    <details class="file" open>
+      <summary><span class="path">vlfz/data/hyperkvasir.py</span><span class="loc">263 LOC</span>
+        <span class="role">Eval dataset + every task + the shared split. &#9733; flagship</span></summary>
+      <div class="body">
+        <p>All four classification tasks are derived from the same labelled images and one
+          stratified split, so pre/post-SSL and cross-task numbers use identical images.</p>
+        <div class="code"><pre><code><span class="ln">56</span>def load_label_table(cfg):        <span class="c"># stem -&gt; {tract, category, finding}</span>
+<span class="ln">63</span>    for row in csv.DictReader(f):  <span class="c"># image-labels.csv: Organ, Classification, Finding</span>
+<span class="ln">76</span>def scan_labeled_images(cfg):     <span class="c"># [(path, label_dict)], memoised</span>
+<span class="ln">99</span>def _task_label(lab, task):
+<span class="ln">100</span>    if task == "hkv_findings":  return lab["finding"]
+<span class="ln">104</span>    if task == "hkv_tract":     return "upper" if lab["tract"].startswith("upper") else "lower"
+<span class="ln">106</span>    if task == "hkv_pathology": return "pathological" if lab["category"]=="pathological-findings" else "other"
+<span class="ln">111</span>def global_split(cfg):            <span class="c"># ONE stratified image-level 3-way split, cached</span>
+<span class="ln">144</span>def canonical_classes(cfg, task):<span class="c"># label set + order, from GLOBAL counts, cached</span>
+<span class="ln">166</span>def build_task(cfg, task, split):<span class="c"># -&gt; [(path, int_label)]</span></code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L56&ndash;70</span> Parse <code>image-labels.csv</code> into
+            <code>stem &rarr; {tract, category, finding}</code>; <code>_norm</code> lowercases and
+            hyphenates so CSV and folder spellings agree.</li>
+          <li><span class="r">L76&ndash;95</span> <code>scan_labeled_images</code> globs every
+            <code>*.jpg</code> under the labelled tree, joins to the CSV, falls back to the
+            folder path for images the CSV misses. Memoised in <code>_SCAN_CACHE</code>.</li>
+          <li><span class="r">L99&ndash;108</span> <code>_task_label</code> collapses the label
+            hierarchy per task &mdash; the 20-way finding string, the 4-way category, or a binary
+            derived from them.</li>
+          <li><span class="r">L111&ndash;141</span> <code>global_split</code>: seeded, stratified
+            on the 23-way finding, per-class shuffle then slice .60/.15/.25 into
+            <code>reference</code>/<code>cal</code>/<code>query</code>. Cached to
+            <code>hkv_splits.json</code>. <strong>Caveat, recorded in every JSON:</strong>
+            HyperKvasir has no procedure ID, so this is image-level &mdash; near-duplicate
+            frames can span splits.</li>
+          <li><span class="r">L144&ndash;163</span> <code>canonical_classes</code> &mdash; the
+            fix for a real bug. The label set and its integer ordering are derived <em>once</em>
+            from the global label distribution (the <code>min_class</code> rare-class filter
+            applied to global counts) and cached. Deriving it per split let the same string map
+            to different integers in <code>reference</code> vs <code>query</code>, which silently
+            wrecked k-NN &mdash; <code>hkv_findings</code> scored 2.9% (below chance) before this,
+            84.6% after.</li>
+          <li><span class="r">L166&ndash;193</span> <code>build_task</code>: keep images whose
+            stem is in the requested split and whose label survived the filter, map through the
+            shared <code>c2i</code>. Optional per-class cap for smoke runs.</li>
+          <li><span class="r">L201&ndash;213</span> <code>seg_pairs</code>: pair each segmented
+            image with its mask, seeded-shuffle, first 100 &rarr; <code>support</code>, rest
+            &rarr; <code>query</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/data/gastronet.py</span><span class="loc">268 LOC</span>
+        <span class="role">SSL corpus &mdash; 3 read paths, manifest, WebDataset loader.</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">27</span>def resolve_source(cfg, override=None):  <span class="c"># local_zip | local_webdataset | s3_webdataset</span>
+<span class="ln">43</span>def build_manifest(cfg):     <span class="c"># &lt;cache&gt;/gastronet_manifest.tsv : "&lt;shard_idx&gt;\t&lt;member&gt;"</span>
+<span class="ln">81</span>def subset_indices(mf, n, seed):  <span class="c"># shard-balanced subset of n rows</span>
+<span class="ln">100</span>class GastroNetDataset:      <span class="c"># local_zip: lazy per-worker zip handles, map-style</span>
+<span class="ln">142</span>def webdataset_shards(cfg, source):   <span class="c"># local .tar paths, or presigned S3 GET URLs</span>
+<span class="ln">179</span>def webdataset_loader(cfg, transform, collate, *, source, batch_size, num_workers, steps_per_epoch, ...):</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L27&ndash;32</span> Source precedence: explicit arg &rarr; env
+            <code>GASTRONET_SOURCE</code> &rarr; config default (<code>local_webdataset</code>).</li>
+          <li><span class="r">L43&ndash;69</span> <code>build_manifest</code> (local_zip only):
+            one <code>zipfile.namelist()</code> pass over every shard &rarr; a cached TSV of
+            <code>(shard_index, member)</code>, plus a <code>.meta</code> with shard/image
+            counts.</li>
+          <li><span class="r">L81&ndash;97</span> <code>subset_indices</code>: bucket manifest
+            rows by shard, shuffle each bucket with a seeded RNG, take <code>n // n_shards</code>
+            from each &mdash; a shard-balanced subset so the SSL sample isn't dominated by a few
+            zips.</li>
+          <li><span class="r">L100&ndash;134</span> <code>GastroNetDataset</code>: map-style,
+            opens each zip lazily and caches the handle per worker
+            (<code>self._zh[si]</code>); a corrupt member yields a black 224&sup2; placeholder
+            rather than crashing.</li>
+          <li><span class="r">L142&ndash;176</span> <code>webdataset_shards</code>: for
+            <code>local_webdataset</code>, sorted <code>*.tar</code> under
+            <code>&lt;root&gt;/webdataset/</code>; for <code>s3_webdataset</code>, list the
+            bucket and return <code>generate_presigned_url("get_object", &hellip;)</code> per
+            shard &mdash; wds's own HTTPS fetcher reads those directly, no <code>aws</code> CLI
+            in the worker, bucket stays private.</li>
+          <li><span class="r">L199&ndash;214</span> The wds pipeline:
+            <code>WebDataset(urls, resampled=True)</code> &rarr; <code>.shuffle(2000)</code>
+            &rarr; <code>.map(_decode)</code> (JPEG bytes &rarr; PIL &rarr; the LeJEPA/DINO
+            transform, returning a list of views) &rarr; <code>.batched(bs, collation_fn)</code>.</li>
+          <li><span class="r">L216&ndash;224</span> The epoch-length fix (Part&nbsp;5):
+            <code>.with_epoch()</code> is applied to a <code>wds.WebLoader</code> wrapping the
+            <code>DataLoader</code>, <em>after</em> the worker fan-in, so an epoch is exactly
+            <code>steps_per_epoch</code> batches regardless of <code>num_workers</code>. On the
+            per-worker dataset it multiplied by 12.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/data/transforms.py</span><span class="loc">90 LOC</span>
+        <span class="role">Eval transform + the two SSL view generators.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L10&ndash;24</span> <code>eval_transform</code>: resize to a square
+            224 (bicubic) &rarr; <code>ToTensor</code> &rarr; ImageNet normalise. One transform
+            for every feature-extraction call, both stages.</li>
+          <li><span class="r">L27&ndash;35</span> <code>_ssl_photometric</code>: rotation
+            (&plusmn;15&deg;), colour jitter, probabilistic Gaussian blur &mdash; and
+            <strong>no flip, no grayscale</strong>: laterality is diagnostic in endoscopy and
+            colour carries pathology signal.</li>
+          <li><span class="r">L51&ndash;62</span> <code>TwoViewTransform</code> (LeJEPA): two
+            i.i.d. random-resized-crop views at 224.</li>
+          <li><span class="r">L65&ndash;82</span> <code>MultiCropTransform</code> (DINO): 2 global
+            crops (scale 0.4&ndash;1.0) + <code>n_local</code> local crops (0.05&ndash;0.4), all
+            resized to 224.</li>
+          <li><span class="r">L85&ndash;90</span> <code>multicrop_collate</code>: list of
+            per-sample crop-lists &rarr; list of <code>K</code> stacked tensors (crop-major) &mdash;
+            what both <code>SSLModule</code> branches consume.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/data/registry.py</span><span class="loc">77 LOC</span>
+        <span class="role">Uniform dataset provider.</span></summary>
+      <div class="body">
+        <p>A tiny indirection so <code>run_eval</code> never imports a dataset module directly.
+          <code>_HyperKvasir</code> and <code>_RealColon</code> each expose <code>cls_tasks</code>,
+          <code>seg_tasks</code>, <code>n_classes(cfg,task)</code>, <code>build(cfg,task,split)</code>
+          and <code>split_sizes(cfg)</code>; <code>get_dataset("hyperkvasir")</code> returns the
+          singleton. All method bodies are lazy imports so pulling in one provider never drags
+          in the other's dependencies.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: ssl ---- -->
+  <div class="layer">
+    <h3>Layer · ssl</h3>
+    <p class="intro">Two objectives, one training loop. The loss libraries are pure functions,
+      ported unchanged from the reference implementation; <code>pretrain.py</code> wraps them in
+      a Lightning module.</p>
+
+    <details class="file">
+      <summary><span class="path">vlfz/ssl/lejepa_lib.py</span><span class="loc">78 LOC</span>
+        <span class="role">LeJEPA loss stack (SIGReg + variance hinge + stop-grad prediction).</span></summary>
+      <div class="body">
+        <p><code>loss = prediction_loss + &lambda;&middot;SIGReg + w&middot;variance_hinge</code>.
+          The invariance term cannot collapse embeddings because its target is stop-gradient'd;
+          SIGReg shapes the embedding distribution toward an isotropic Gaussian; the hinge is a
+          numerically-stable floor on per-feature std.</p>
+        <div class="code"><pre><code><span class="ln">30</span>def variance_hinge(z, target_std=1.0, eps=1e-4):
+<span class="ln">31</span>    std = torch.sqrt(z.var(dim=0) + eps)
+<span class="ln">32</span>    return torch.relu(target_std - std).mean()
+<span class="ln">35</span>def sigreg(z, n_slices=256, n_freq=16, freq_max=5.0):
+<span class="ln">40</span>    zc = _standardize(z)
+<span class="ln">41</span>    dirs = torch.randn(D, n_slices, ...) ; dirs /= dirs.norm(dim=0)  <span class="c"># random 1-D projections</span>
+<span class="ln">43</span>    proj = zc @ dirs
+<span class="ln">46</span>    ecf_re = torch.cos(tx).mean(0) ; ecf_im = torch.sin(tx).mean(0)  <span class="c"># empirical char. fn</span>
+<span class="ln">48</span>    cf_re = torch.exp(-0.5 * ts**2)                                  <span class="c"># standard-normal CF</span>
+<span class="ln">50</span>    diff = (ecf_re - cf_re)**2 + ecf_im**2
+<span class="ln">51</span>    return (diff * weight).mean()
+<span class="ln">54</span>def prediction_loss(emb_a, emb_b, predictor):
+<span class="ln">57</span>    return 0.5*(smooth_l1(pred(emb_a), emb_b.detach()) + smooth_l1(pred(emb_b), emb_a.detach()))</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L35&ndash;51</span> <code>sigreg</code> &mdash; Sketched Isotropic
+            Gaussian Regularization. Project the standardised batch onto 256 random unit
+            directions; for each, compare the empirical characteristic function to the
+            standard-normal CF <code>exp(&minus;t&sup2;/2)</code> at 16 frequencies; a
+            Gaussian integration weight downweights high frequencies. Zero iff every 1-D
+            projection looks standard-Gaussian &mdash; by Cram&eacute;r&ndash;Wold that means the
+            joint is isotropic Gaussian. Cost linear in dim and batch.</li>
+          <li><span class="r">L54&ndash;59</span> <code>prediction_loss</code>: symmetric
+            smooth-L1 between a predictor's output and the <em>detached</em> other view &mdash;
+            stop-grad is what stops the trivial constant solution.</li>
+          <li><span class="r">L72&ndash;78</span> <code>effective_rank</code>:
+            <code>exp(entropy(normalised singular values))</code> of the centred batch &mdash;
+            a collapse proxy logged each epoch (full rank &rarr; ~D).</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/ssl/dino_lib.py</span><span class="loc">47 LOC</span>
+        <span class="role">DINO v1 loss + LR / teacher-temp schedules.</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">15</span>def dino_loss(student_out, teacher_out, center, student_temp, teacher_temp):
+<span class="ln">19</span>    t = [softmax((tt - center)/teacher_temp, -1).detach() for tt in teacher_out]
+<span class="ln">21</span>    for ti, tq in enumerate(t):
+<span class="ln">22</span>        for si, sq in enumerate(student_out):
+<span class="ln">23</span>            if si == ti: continue     <span class="c"># skip identical view</span>
+<span class="ln">25</span>            total += -(tq * log_softmax(sq/student_temp, -1)).sum(-1).mean()
+<span class="ln">38</span>def cosine_lr(step, total, base_lr, min_lr, warmup):
+<span class="ln">45</span>def teacher_temp_at(step, total, t0, t1, warmup_frac):</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L15&ndash;27</span> Cross-entropy of every student crop against
+            every teacher (global-crop) distribution, skipping the matching view. Teacher output
+            is centered (running mean subtracted) and sharpened (low temperature) then
+            detached &mdash; centering + sharpening is DINO's anti-collapse mechanism.</li>
+          <li><span class="r">L30&ndash;35</span> <code>update_center</code>: EMA of the
+            batch-mean teacher output, momentum 0.9.</li>
+          <li><span class="r">L38&ndash;42</span> <code>cosine_lr</code>: linear warmup then
+            cosine to <code>min_lr</code>. <strong>Keyed on the global step</strong> &mdash;
+            the frozen-step bug in Part&nbsp;5 pinned this at the warmup-step-0 value, i.e. 0.</li>
+          <li><span class="r">L45&ndash;47</span> <code>teacher_temp_at</code>: linear ramp
+            <code>t0&rarr;t1</code> over the first <code>warmup_frac</code> of training.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file" open>
+      <summary><span class="path">vlfz/ssl/pretrain.py</span><span class="loc">471 LOC</span>
+        <span class="role">The Lightning SSL entrypoint &mdash; both objectives, one loop. &#9733; flagship</span></summary>
+      <div class="body">
+        <p>Manual optimization: the dual objective, LLRD parameter groups, and the EMA /
+          teacher / centering updates need explicit control, so Lightning does hooks and
+          device/precision but not the optimizer step scheduling.</p>
+
+        <h4>Data &mdash; <code>_make_loader</code> (L55) &amp; <code>GastroNetDataModule</code> (L104)</h4>
+        <div class="code"><pre><code><span class="ln">55</span>def _make_loader(cfg, args, transform, collate, *, bs, nw, dev):
+<span class="ln">68</span>    if args.corpus == "hkv_unlabeled":  ...        <span class="c"># map-style fallback pool</span>
+<span class="ln">81</span>    if source == "local_zip":  return _plain(GastroNetDataset(...))
+<span class="ln">89</span>    per_shard = cfg.ssl.wds_images_per_shard       <span class="c"># 10000</span>
+<span class="ln">93</span>    elif cfg.ssl.steps_per_epoch &gt; 0:  steps = cfg.ssl.steps_per_epoch
+<span class="ln">96</span>    else: steps = (n_shards * per_shard) // bs
+<span class="ln">97</span>    dl = webdataset_loader(cfg, transform, collate, source=source, batch_size=bs,
+<span class="ln">98</span>                           num_workers=nw, steps_per_epoch=steps, seed=cfg.seed)</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L55&ndash;66</span> Returns <code>(dataloader, steps_per_epoch)</code>.
+            Map-style corpora get a normal shuffled <code>DataLoader</code> (<code>_plain</code>);
+            its length is the epoch.</li>
+          <li><span class="r">L78&ndash;101</span> The WebDataset tier is iterable, so the epoch
+            length is set explicitly: an env/config override, else
+            <code>shards &times; images-per-shard / batch</code>. For the current subset that is
+            <code>60 &times; 10000 / 128 = 4687</code> steps/epoch.</li>
+          <li><span class="r">L104&ndash;125</span> <code>GastroNetDataModule</code> memoises the
+            loader so the S3 listing / presign happens at most once per job; the same class is
+            reused by <code>eval/features.py</code> for <code>Trainer.predict</code>.</li>
+        </ul>
+
+        <h4>Optimizer groups &mdash; <code>llrd_param_groups</code> (L129)</h4>
+        <ul class="ann">
+          <li><span class="r">L129&ndash;150</span> Layer-wise LR decay: the aux heads and the
+            final norm get full LR; block <code>i</code> gets
+            <code>base_lr &middot; decay^(depth&minus;i)</code> (0.75<sup>k</sup>), so early
+            layers barely move &mdash; a strong pretrained init is preserved on a short
+            schedule. An <code>id()</code> set prevents a parameter landing in two groups.</li>
+        </ul>
+
+        <h4><code>SSLModule</code> &mdash; construction (L169)</h4>
+        <div class="code"><pre><code><span class="ln">174</span>        self.automatic_optimization = False
+<span class="ln">183</span>        if torch.cuda.is_available(): backbone.set_grad_checkpointing(True)
+<span class="ln">190</span>        if args.objective == "lejepa":
+<span class="ln">192</span>            self.proj = Projector(d, lp.proj_dim) ; self.pred = Predictor(...)
+<span class="ln">196</span>            ema_bb = EMA(self.backbone, base_decay=cfg.ssl.ema_base)
+<span class="ln">197</span>            self.ema_bb, self.ema_bb_net = ema_bb, ema_bb.ema   <span class="c"># .ema registers as a submodule</span>
+<span class="ln">198</span>        else:                                                   <span class="c"># dino</span>
+<span class="ln">200</span>            self.head = DINOHead(d, dp.out_dim)
+<span class="ln">203</span>            teacher = EMA(nn.ModuleDict({"bb": self.backbone, "head": self.head}), 0.996)
+<span class="ln">206</span>            self.register_buffer("center", torch.zeros(dp.out_dim))</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L196&ndash;206</span> Assigning <code>ema_bb.ema</code> /
+            <code>teacher.ema</code> (and <code>register_buffer</code> for the DINO centering
+            vector) as attributes makes them real submodules/buffers &mdash; so Lightning's
+            checkpoint round-trips the EMA weights and centering state for free on resume.</li>
+        </ul>
+
+        <h4><code>training_step</code> (L236) &mdash; the load-bearing loop</h4>
+        <div class="code"><pre><code><span class="ln">237</span>    cfg, opt = self.cfg, self.optimizers()
+<span class="ln">238</span>    cur_lr = self._set_lr(opt)                       <span class="c"># cosine_lr(self.global_step, ...)</span>
+<span class="ln">241</span>    if self.args.objective == "lejepa":
+<span class="ln">243</span>        z1, z2 = self.proj(self.backbone.feature(v1)), self.proj(self.backbone.feature(v2))
+<span class="ln">244</span>        loss, parts = lejepa_loss(z1, z2, self.pred, ...)
+<span class="ln">252</span>    else:                                            <span class="c"># dino</span>
+<span class="ln">258</span>        s_out = [self.head(self.backbone.feature(c)) for c in crops]
+<span class="ln">259</span>        with torch.no_grad(): t_out = [teacher head/bb over the 2 global crops]
+<span class="ln">262</span>        loss = dino_loss(s_out, t_out, self.center, dp.student_temp, t_temp)
+<span class="ln">265</span>    if not torch.isfinite(loss): opt.zero_grad(); return None   <span class="c"># NaN-skip guard</span>
+<span class="ln">270</span>    self.manual_backward(loss)
+<span class="ln">271</span>    self.clip_gradients(opt, gradient_clip_val=cfg.ssl.grad_clip, ...)
+<span class="ln">283</span>    if torch.cuda.is_available(): opt.step()         <span class="c"># advances trainer.global_step</span>
+<span class="ln">286</span>    else:                         opt.optimizer.step()   <span class="c"># CPU-only hang bypass</span>
+<span class="ln">289</span>    if self.ema_bb  is not None: self.ema_bb.update(self.backbone)
+<span class="ln">291</span>    if self.teacher is not None:
+<span class="ln">292</span>        m = cosine_momentum(gstep, self.total_steps, 0.996)
+<span class="ln">294</span>        self.teacher.update(nn.ModuleDict({"bb": self.backbone, "head": self.head}), decay=m)
+<span class="ln">295</span>        update_center(self.center, [o.detach() for o in t_out], cfg.ssl.dino.center_momentum)
+<span class="ln">302</span>    if (gstep + 1) % cfg.ssl.ckpt_every_steps == 0: self.save_eval_backbone()</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L238</span> <code>_set_lr</code> recomputes the cosine LR from
+            <code>self.global_step</code> every step and writes it into each param group,
+            scaled by that group's LLRD factor.</li>
+          <li><span class="r">L241&ndash;263</span> The objective branch. LeJEPA: two views &rarr;
+            backbone &rarr; projector &rarr; <code>lejepa_loss</code>. DINO: all crops &rarr;
+            student head; the 2 global crops &rarr; frozen teacher; <code>dino_loss</code>.</li>
+          <li><span class="r">L265&ndash;268</span> Non-finite loss &rarr; drop the batch, keep
+            training &mdash; ported from the original loop's NaN guard.</li>
+          <li><span class="r">L270&ndash;287</span> <code>manual_backward</code> &rarr; clip
+            &rarr; step. <strong>The step is CPU/GPU-gated</strong> (Part&nbsp;5): on GPU the
+            normal <code>opt.step()</code> so <code>trainer.global_step</code> advances and the
+            schedules + checkpoint triggers work; the raw-optimizer bypass is kept only for CPU
+            login-node smokes where it was a hang workaround.</li>
+          <li><span class="r">L289&ndash;295</span> Post-step bookkeeping: LeJEPA updates the
+            weight-EMA; DINO updates the momentum teacher and the centering vector.</li>
+          <li><span class="r">L302&ndash;308</span> Every <code>ckpt_every_steps</code> (and on
+            <code>--limit-steps</code>) write <code>ema_backbone.pt</code>.</li>
+        </ul>
+
+        <h4><code>save_eval_backbone</code> (L328) &amp; <code>train</code> (L342)</h4>
+        <ul class="ann">
+          <li><span class="r">L328&ndash;338</span> Writes <code>{ema_backbone: trunk.state_dict(),
+            init, objective, corpus, gstep, provenance}</code> &mdash; the DINO teacher's
+            backbone, or LeJEPA's weight-EMA. Shape is deliberately identical to the
+            pre-Lightning checkpoint so <code>run_eval</code> needs no change.</li>
+          <li><span class="r">L342&ndash;353</span> <code>train()</code>: on CPU only, force
+            <code>torch.set_num_threads(1)</code> (login-node contention guard).</li>
+          <li><span class="r">L371&ndash;374</span> A <code>DONE</code> flag file short-circuits
+            a finished run &mdash; the sbatch script's self-resubmit loop reads it.</li>
+          <li><span class="r">L405&ndash;417</span> <code>ModelCheckpoint(every_n_train_steps=
+            ckpt_every_steps, save_last=True, save_top_k=1)</code> (no metric to monitor in
+            unsupervised SSL); <code>Trainer(max_epochs, precision="bf16-mixed",
+            devices=1)</code>; <code>fit(&hellip;, ckpt_path=last.ckpt)</code> resumes.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: eval ---- -->
+  <div class="layer">
+    <h3>Layer · eval</h3>
+    <p class="intro">Given a frozen backbone: extract features, run weighted k-NN, score
+      calibration, add context metrics, write one JSON. The maths is plain numpy/sklearn &mdash;
+      no training here.</p>
+
+    <details class="file">
+      <summary><span class="path">vlfz/eval/features.py</span><span class="loc">107 LOC</span>
+        <span class="role">Cached frozen-feature extraction.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L21&ndash;26</span> <code>_key</code>: SHA-1 over (backbone tag,
+            img size, count, per-sample basename+label) &rarr; the <code>.npz</code> cache
+            filename. Re-running an eval is free if the features exist.</li>
+          <li><span class="r">L48&ndash;56</span> <code>_FeatModule</code>: a predict-only
+            <code>LightningModule</code> whose <code>predict_step</code> returns
+            <code>(feature.cpu(), y, index)</code>.</li>
+          <li><span class="r">L82&ndash;97</span> Build the <code>DataLoader</code> +
+            <code>pl.Trainer(&hellip;, precision="bf16-mixed" if cuda else 32).predict()</code>
+            &mdash; same device/precision handling as SSL training.</li>
+          <li><span class="r">L99&ndash;107</span> Scatter batches back into an
+            <code>(N, 768)</code> array <em>by index</em> (predict batches can arrive
+            unordered), <code>nan_to_num</code>, save <code>X</code>/<code>y</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file" open>
+      <summary><span class="path">vlfz/eval/knn.py</span><span class="loc">78 LOC</span>
+        <span class="role">Weighted k-NN &mdash; the zero-shot classifier. &#9733; flagship</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">26</span>def knn_vote(x_ref, y_ref, x_q, *, n_classes=None, k=20, tau=0.07, l2norm=True, q_chunk=4096):
+<span class="ln">45</span>    if l2norm: Xr, Xq = _l2(Xr), _l2(Xq)
+<span class="ln">49</span>    onehot = zeros(R, C) ; onehot[arange(R), yr] = 1
+<span class="ln">53</span>    for i in range(0, Nq, q_chunk):
+<span class="ln">54</span>        sims = Xq[i:i+q_chunk] @ Xr.T                 <span class="c"># cosine (features L2-normed)</span>
+<span class="ln">55</span>        top_s, top_i = sims.topk(k, dim=1)
+<span class="ln">56</span>        w = softmax(top_s / tau, dim=1)               <span class="c"># neighbour weights</span>
+<span class="ln">58</span>        vote_mass[i:i+q_chunk] = (w[...,None] * onehot[top_i]).sum(1)
+<span class="ln">61</span>    probs  = vm / clip(vm.sum(1, keepdims=True), eps, None)
+<span class="ln">65</span>    logits = log(clip(probs, 1e-6, 1.0))             <span class="c"># well-conditioned, ~[-14, 0]</span>
+<span class="ln">66</span>    return {"probs": probs, "logits": logits, "vote_mass": vm, "k": k, "tau": tau}</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L40&ndash;47</span> Everything to torch on GPU if available;
+            L2-normalise both sides so a dot product is cosine similarity;
+            <code>k = min(k, R)</code>.</li>
+          <li><span class="r">L49&ndash;58</span> Per query chunk: cosine to all references
+            &rarr; top-k &rarr; weights <code>softmax(sim/&tau;)</code> (&tau; = 0.07 makes it
+            sharply favour the nearest) &rarr; accumulate weight into the neighbours' class
+            slots. <code>vote_mass</code> is the raw per-class weight sum.</li>
+          <li><span class="r">L61&ndash;65</span> Two outputs:
+            <code>probs</code> = vote mass normalised to sum 1; <code>logits</code> =
+            <code>log</code> of the <em>normalised</em> votes with a floor. Using normalised
+            votes (not raw <code>log(vote_mass+&epsilon;)</code>) keeps the range bounded so
+            LBFGS temperature scaling stays well-behaved on a small cal split.</li>
+          <li><span class="r">L69&ndash;78</span> <code>knn_k_sweep</code>: accuracy at
+            k &isin; {10,20,50,200} for the sensitivity table in <code>aux</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file" open>
+      <summary><span class="path">vlfz/eval/calibration.py</span><span class="loc">130 LOC</span>
+        <span class="role">ECE / NLL / Brier + temperature scaling. &#9733; flagship</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">42</span>def _reliability(conf, correct, edges):        <span class="c"># shared binning core</span>
+<span class="ln">45</span>    m = (conf &gt; lo) &amp; (conf &lt;= hi)
+<span class="ln">52</span>    ece += c/n * abs(acc_in_bin - conf_in_bin)
+<span class="ln">58</span>def ece_equal_width(probs, y, n_bins=15):      <span class="c"># edges = linspace(0,1,16)</span>
+<span class="ln">66</span>def ece_adaptive(probs, y, n_bins=15):         <span class="c"># edges = confidence quantiles</span>
+<span class="ln">79</span>def fit_temperature(logits, y, max_iter=100):  <span class="c"># LBFGS on log T, Guo et al. 2017</span>
+<span class="ln">90</span>        loss = cross_entropy(lg / log_t.exp(), ty)
+<span class="ln">98</span>    return min(max(T, 1e-2), 1e3)              <span class="c"># guard degenerate cal sets</span>
+<span class="ln">113</span>def calibration_report(logits_q, y_q, logits_cal, y_cal, ...):</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L15&ndash;26</span> <code>_as_probs</code>: accept either a
+            probability vector (rows sum to 1) or logits, softmax the latter &mdash; every metric
+            is robust to which it's handed.</li>
+          <li><span class="r">L29&ndash;39</span> <code>nll</code> = mean
+            <code>&minus;log p[y]</code> with an &epsilon; floor; <code>brier</code> = mean
+            squared error against the one-hot.</li>
+          <li><span class="r">L42&ndash;55</span> <code>_reliability</code>: the shared ECE
+            core &mdash; per bin, <code>|accuracy &minus; mean confidence| &times;</code> bin
+            weight; also returns per-bin counts for a reliability diagram.</li>
+          <li><span class="r">L58&ndash;76</span> Two ECE variants: equal-width (15 fixed
+            0&ndash;1 bins) and adaptive (equal-mass, confidence-quantile edges &mdash; robust
+            when confidence is skewed). Cross-checked to 1e-6 against
+            <code>torchmetrics.MulticlassCalibrationError</code> in the unit tests.</li>
+          <li><span class="r">L79&ndash;98</span> <code>fit_temperature</code>: minimise
+            <code>CE(logits/T, y)</code> over <code>log T</code> with LBFGS + strong-Wolfe line
+            search; clamp <code>T</code> to <code>[1e-2, 1e3]</code> so a tiny or degenerate cal
+            split can't return an absurd scalar.</li>
+          <li><span class="r">L113&ndash;130</span> <code>calibration_report</code> &mdash; the
+            single entry point <code>run_eval</code> uses: metrics on the query logits (pre),
+            then fit <code>T</code> on the cal split and re-score <code>logits_q / T</code>
+            (post). Returns <code>{pre, T, post}</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/eval/metrics.py</span><span class="loc">54 LOC</span>
+        <span class="role">Context metrics + row flattening.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L7&ndash;35</span> <code>context_metrics</code>: accuracy,
+            balanced accuracy, macro-F1, AUROC (binary uses <code>probs[:,1]</code>; multiclass
+            uses one-vs-rest macro) &mdash; the non-calibration columns.</li>
+          <li><span class="r">L38&ndash;54</span> <code>flatten_report</code>: the
+            <code>{pre, post}</code> calibration dict &rarr; one flat row per
+            <code>temp_scaled &isin; {False, True}</code>, ready for the CSV.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/eval/seg.py</span><span class="loc">163 LOC</span>
+        <span class="role">Zero-shot polyp segmentation by dense patch k-NN.</span></summary>
+      <div class="body">
+        <p>No training. Build a patch bank from 100 labelled support images, k-NN every query
+          patch against it, upsample, score.</p>
+        <ul class="ann">
+          <li><span class="r">L29&ndash;40</span> <code>_load_mask_grid</code>: downsample a mask
+            to the 14&times;14 patch grid (bilinear, threshold 0.5) &rarr; per-patch polyp label;
+            <code>_load_mask_full</code> keeps full resolution (nearest) for scoring.</li>
+          <li><span class="r">L43&ndash;53</span> <code>_patch_features</code>:
+            <code>backbone.forward_tokens</code> &rarr; <code>(B, 196, C)</code>, bf16 autocast
+            on GPU.</li>
+          <li><span class="r">L77&ndash;84</span> Support bank: flatten every support image's
+            196 patch features and their patch labels into <code>(S&middot;196, C)</code> /
+            <code>(S&middot;196,)</code>.</li>
+          <li><span class="r">L90&ndash;106</span> Per query batch: patch features &rarr;
+            <code>knn_vote(&hellip;, n_classes=2, k=10, tau=0.1)</code> &rarr; polyp prob per
+            patch &rarr; <code>_upsample</code> (bilinear to 224) &rarr; threshold 0.5 &rarr;
+            per-image Dice and IoU.</li>
+          <li><span class="r">L108&ndash;131</span> Pixel-wise calibration: stack all query
+            pixel probabilities and ground truth, run <code>metric_block</code> globally and on
+            foreground pixels only (<code>nll_fg</code>, <code>ece_ew_fg</code>). One JSON row,
+            <code>protocol = "seg_knn"</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/eval/run_eval.py</span><span class="loc">147 LOC</span>
+        <span class="role">The evaluation orchestrator.</span></summary>
+      <div class="body">
+        <div class="code"><pre><code><span class="ln">28</span>def _backbone_and_tag(cfg, init, objective, stage, corpus):
+<span class="ln">29</span>    if stage == "pre":  return build_vit_b16(init, cfg, pretrained_init=True), f"{init}_pre"
+<span class="ln">31</span>    ckpt = &lt;ckpts&gt;/{objective}_{init}_{corpus}_full/ema_backbone.pt
+<span class="ln">54</span>def evaluate(cfg, *, dataset, init, objective, stage, task, protocols, corpus, ...):
+<span class="ln">63</span>    backbone, tag = _backbone_and_tag(...)
+<span class="ln">66</span>    for split in ("reference", "cal", "query"): feats[split] = extract_features(...)
+<span class="ln">90</span>    q = knn_vote(Xr, yr, Xq, n_classes=C, k=k, tau=tau)
+<span class="ln">91</span>    c = knn_vote(Xr, yr, Xc, n_classes=C, k=k, tau=tau)
+<span class="ln">92</span>    rep = calibration_report(q["logits"], yq, c["logits"], yc, ...)
+<span class="ln">94</span>    ctx = context_metrics(yq, q["probs"])
+<span class="ln">104</span>    json.dump(out, &lt;dataset&gt;__&lt;tag&gt;__&lt;task&gt;.json)</code></pre></div>
+        <ul class="ann">
+          <li><span class="r">L28&ndash;41</span> Resolve the backbone: <code>pre</code> &rarr;
+            frozen public init; <code>post</code> &rarr; the SSL checkpoint at the
+            <code>{objective}_{init}_{corpus}_full/</code> path (tolerates the older tag-less
+            name).</li>
+          <li><span class="r">L66&ndash;77</span> Extract (cached) features for all three
+            splits.</li>
+          <li><span class="r">L87&ndash;97</span> k-NN the query and the cal split against the
+            same reference bank; <code>calibration_report</code> fits T on cal and scores query;
+            <code>context_metrics</code> on the query probs; append the k-sweep to
+            <code>aux</code>.</li>
+          <li><span class="r">L110&ndash;143</span> CLI: <code>--task all</code> honours the
+            configured task subset; a seg task routes to <code>run_seg</code>; otherwise loop
+            the tasks and write one JSON each.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: report ---- -->
+  <div class="layer">
+    <h3>Layer · report</h3>
+    <p class="intro">Turn the pile of per-run JSONs into one long table, one delta table, and a
+      markdown pivot with automatic caution flags.</p>
+
+    <details class="file">
+      <summary><span class="path">vlfz/report/aggregate.py</span><span class="loc">92 LOC</span>
+        <span class="role">results/*.json &rarr; long_results.csv + delta view.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L14&ndash;41</span> <code>_ROW_COLS</code> fixes the column set;
+            <code>collect</code> reads every JSON's <code>rows</code>, attaches the git SHA +
+            timestamp + source filename.</li>
+          <li><span class="r">L44&ndash;59</span> <code>delta_view</code>: match each
+            <code>post</code> row to its <code>pre</code> counterpart on
+            <code>(dataset, init, task, protocol, temp_scaled)</code> &mdash; <code>pre</code>
+            has <code>objective/corpus = "none"</code> so it merges against every post variant
+            &mdash; and emit <code>d_&lt;metric&gt; = post &minus; pre</code> for ECE, NLL, Brier,
+            accuracy, AUROC, Dice, mIoU. This is the headline of the whole project.</li>
+          <li><span class="r">L62&ndash;89</span> Write <code>long_results.csv</code>,
+            <code>delta_results.csv</code>, and hand both to <code>write_pivot</code>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">vlfz/report/pivot.py</span><span class="loc">62 LOC</span>
+        <span class="role">CSV &rarr; scannable markdown, with the leakage flag.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L23&ndash;32</span> <code>_suspect</code>: append
+            &ldquo;&#9888;&rdquo; when accuracy &gt; 0.98 or balanced-acc &gt; accuracy + 0.02
+            &mdash; the heuristic that flagged <code>hkv_tract</code> in Part&nbsp;2.</li>
+          <li><span class="r">L35&ndash;47</span> <code>_table</code>: primary columns
+            (ECE ew, ECE adaptive, NLL) + Dice/mIoU + context (accuracy, balanced-acc, AUROC),
+            sorted by dataset/task/protocol/init/objective/stage.</li>
+          <li><span class="r">L50&ndash;62</span> <code>write_pivot</code>: the &ldquo;All
+            results&rdquo; table, then &mdash; when a delta frame is supplied &mdash; a
+            &ldquo;&Delta; (post-SSL &minus; pre-SSL)&rdquo; table where negative &Delta; on
+            ECE / NLL means SSL improved calibration.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: lrz ---- -->
+  <div class="layer">
+    <h3>Layer · lrz &mdash; SLURM orchestration</h3>
+    <p class="intro">Single-GPU, self-resubmitting, checkpoint-resumed jobs on the LRZ AI
+      cluster. No DDP, no Hydra, no wandb.</p>
+
+    <details class="file">
+      <summary><span class="path">lrz/job_env.sh</span><span class="loc">67 lines</span>
+        <span class="role">Common runtime environment, sourced by every job.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L7&ndash;27</span> Repo root, scratch caches
+            (<code>$MCMLSCRATCH</code> &mdash; home is quota-limited), the dedicated
+            <code>.venv</code> on <code>PATH</code>, data roots (<code>GASTRONET_ROOT</code> on
+            project scratch, outputs on the home quota).</li>
+          <li><span class="r">L38&ndash;42</span> AWS: <code>AWS_PROFILE=gastronet-reader</code>
+            (the read-only key), region <code>eu-north-1</code>, bucket name from
+            <code>~/.gastronet_bucket</code>.</li>
+          <li><span class="r">L47&ndash;53</span> <code>wait_for_gpu</code>: retry
+            <code>torch.cuda.is_available()</code> six times &mdash;
+            <code>torch.cuda</code> can transiently report false right after allocation on a
+            busy node. A hard fail triggers a resubmit.</li>
+          <li><span class="r">L56&ndash;66</span> Resolve the Hugging Face token (gated SigLIP-2
+            mirrors) from <code>huggingface_hub</code> or a dotfile, without a GPU call, so this
+            is safe to source on a login node.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">lrz/sbatch_ssl_pretrain.sbatch</span><span class="loc">38 lines</span>
+        <span class="role">Self-resubmitting single-GPU SSL, one variant per job.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">L3&ndash;8</span> Partition
+            <code>lrz-hgx-h100-94x4,lrz-hgx-a100-80x4</code>, <code>--gres=gpu:1</code>,
+            <code>--time=06:00:00</code> (cut from 12 h for better backfill &mdash; the
+            self-resubmit covers any overrun).</li>
+          <li><span class="r">L18</span> <code>wait_for_gpu || { sbatch "$0"; exit; }</code>
+            &mdash; a bad node re-queues the job instead of failing it.</li>
+          <li><span class="r">L28&ndash;30</span> Runs
+            <code>"$VIRTUAL_ENV/bin/python" -m vlfz.ssl.pretrain</code> <em>directly</em>, not
+            via <code>srun</code>: on this cluster <code>srun</code> does not reliably carry the
+            sbatch environment (<code>SSL_EPOCHS</code>, <code>GASTRONET_SOURCE</code>, the venv
+            <code>PATH</code>) onto the step.</li>
+          <li><span class="r">L32&ndash;37</span> If <code>$OUT_DIR/DONE</code> exists, finish;
+            else <code>sbatch "$0"</code> &mdash; resume from <code>last.ckpt</code> on the next
+            allocation.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">lrz/submit_ssl_matrix.sh · submit_eval_chain.sh</span><span class="loc">27 + 47 lines</span>
+        <span class="role">Queue the SSL matrix; queue the eval chain.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">matrix</span> Loops <code>{lejepa,dino} &times; {siglip2,imagenet}</code>
+            and <code>sbatch</code>es one job each with <code>OBJ</code>/<code>INIT</code>/
+            <code>STAGE</code>/<code>CORPUS</code> in the environment. <code>TIER=lejepa</code>
+            restricts to the two cheaper runs.</li>
+          <li><span class="r">chain</span> Submits the two <code>pre</code> baselines, then a
+            <code>post</code> job for every <code>{obj}_{init}_{corpus}_full/ema_backbone.pt</code>
+            that exists. Aggregation is <em>not</em> submitted as a job &mdash; it's pure pandas
+            and runs in seconds on the login node, which sidesteps venv-visibility issues on
+            compute nodes.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">lrz/sbatch_eval.sbatch · setup_env.sh · sbatch_smoke.sbatch</span><span class="loc">34 + &hellip; lines</span>
+        <span class="role">Per-setting eval job; one-time venv build; GPU validation.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">eval</span> One <code>(dataset, init, stage[, obj, corpus])</code>
+            &rarr; <code>run_eval --task all</code> + the seg step. <code>--time=03:00:00</code>.</li>
+          <li><span class="r">setup_env</span> <code>uv venv --python 3.10</code> then
+            <code>uv pip install -e ".[dev]"</code> &mdash; torch 2.5.1+cu121, timm, open_clip,
+            lightning, webdataset, boto3.</li>
+          <li><span class="r">smoke</span> 40-min job: unit tests + a LeJEPA and DINO SSL smoke
+            on a real GPU node &mdash; the validation that the Lightning path runs end-to-end
+            for all four combos.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: pipeline ---- -->
+  <div class="layer">
+    <h3>Layer · pipeline &mdash; the AWS data pipeline (retired, not in use)</h3>
+    <p class="intro">Built to demonstrate a clean cloud &rarr; cluster data path. The Terraform
+      infrastructure is complete and was applied, but the cloud ingest was abandoned for a
+      new-account restriction and is being torn down. <strong>No part of the current pipeline
+      depends on it</strong> &mdash; the same curation logic runs directly on LRZ instead
+      (<code>portal_to_wds.py</code>, below), which is the code path that actually produced the
+      SSL corpus.</p>
+
+    <details class="file">
+      <summary><span class="path">pipeline/infra/*.tf</span><span class="loc">9 files</span>
+        <span class="role">Terraform: the whole data lake as code.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">s3.tf</span> The lake bucket &mdash; versioned, SSE-S3,
+            block-public-access, lifecycle rules (raw &rarr; Glacier Instant Retrieval after
+            30 days).</li>
+          <li><span class="r">iam.tf</span> An instance-profile role scoped to
+            <code>raw/</code>+<code>webdataset/</code>+<code>catalog/</code> for ingest, and a
+            read-only managed policy to attach to the existing <code>read-only-agent</code> user
+            (deliberately not auto-attached &mdash; that user lives outside this state).</li>
+          <li><span class="r">athena.tf</span> Glue database + Athena workgroup + external
+            tables (<code>manifest</code>, <code>curated</code>) over Hive-partitioned Parquet.</li>
+          <li><span class="r">ingest_ec2.tf</span> The ephemeral instance &mdash; on-demand
+            <code>c7i.2xlarge</code>, SSM-driven, no inbound, ships <code>pipeline/</code> via an
+            <code>archive_file</code> &rarr; <code>bootstrap/pipeline_src.zip</code>.</li>
+          <li><span class="r">budgets.tf</span> A monthly cost budget with SNS email alarms at
+            40% and 100%.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">pipeline/ingest/portal_to_wds.py</span><span class="loc">147 LOC</span>
+        <span class="role">Portal &rarr; local curated WebDataset tier (the path used).</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">flow</span> Per portal file: <code>POST
+            /api/provided_file/&lt;id&gt;/download_url/</code> &rarr; 10-minute presigned URL
+            &rarr; stream the zip to scratch (Range-resume on expiry) &rarr;
+            <code>Pool(--jobs)</code> over its members.</li>
+          <li><span class="r">_one_image</span> decode &rarr; perceptual hash &rarr; resize
+            short side to 224 (downscale only) &rarr; re-encode JPEG q87.</li>
+          <li><span class="r">ShardWriter</span> append to <code>gn-{idx:05d}.tar</code>,
+            rotate every <code>--pack</code> (10k) images; <code>_ingested.txt</code> for resume,
+            <code>.phash</code> sidecars for cross-zip dedup; delete the zip when done.</li>
+          <li><span class="r">result</span> 60 zips &rarr; 581,518 kept / 268 dropped / 60
+            shards / 8.1 GB in 155 min.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="file">
+      <summary><span class="path">pipeline/{catalog,curate,dq,stage}/ · flow.py · kick_ingest.sh</span><span class="loc">6 files</span>
+        <span class="role">The cloud pipeline steps (built, wired for SSM).</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">catalog</span> <code>build_manifest.py</code>: stream each
+            <code>raw/*.zip</code> from S3, read headers only, write one Parquet row per image
+            (dimensions, sha256, phash, corrupt flag) partitioned by <code>shard_group</code>.</li>
+          <li><span class="r">curate</span> <code>curate_shard.py</code>: the same
+            decode/resize/dedup/pack as <code>portal_to_wds</code>, as an AWS Batch array job
+            over shard-groups (+ a <code>Dockerfile</code>).</li>
+          <li><span class="r">dq</span> <code>checks.py</code>: a data-quality report over the
+            Parquet catalogs &mdash; count vs ~4.82M, corrupt rate, duplicate-cluster rate,
+            dimension histograms &rarr; <code>data_report.md</code>.</li>
+          <li><span class="r">stage</span> <code>select_subset.py</code> (default: every shard;
+            optional global dedup / cap) + <code>stage_in.sh</code> (sha256-verified
+            <code>aws s3 sync</code> to <code>$GASTRONET_ROOT</code>).</li>
+          <li><span class="r">flow / kick</span> <code>flow.py</code> sequences
+            terraform + SSM steps (Prefect DAG if installed); <code>kick_ingest.sh</code> is the
+            one paste-safe driver &mdash; re-ship code, upload the portal session, SSM
+            <code>send-command</code> via a JSON params file.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---- LAYER: dormant ---- -->
+  <div class="layer">
+    <h3>Layer · dormant (kept, unreferenced)</h3>
+    <details class="file">
+      <summary><span class="path">data/realcolon.py · data/folds.py · eval/edl.py · report/leakage_audit.py</span>
+        <span class="loc">333 + 58 + 173 + 70 LOC</span>
+        <span class="role">Code that was built, then set aside by a scope decision.</span></summary>
+      <div class="body">
+        <ul class="ann">
+          <li><span class="r">realcolon.py</span> Full REAL-Colon loader (VOC-XML boxes,
+            <code>rc_frame</code> / <code>rc_lesion</code> tasks, by-video splits). Dropped when
+            REAL-Colon (946 GB) would not fit; kept for if storage frees up.</li>
+          <li><span class="r">folds.py</span> <code>grouped_stratified_split</code> &mdash;
+            partition videos into query/reference/cal keeping the stratum mix even. REAL-Colon
+            only; HyperKvasir uses the simpler per-class slice.</li>
+          <li><span class="r">edl.py</span> Evidential deep learning (Sensoy et al. 2018) &mdash;
+            Dirichlet k-NN from vote mass + an evidential linear head. Evaluated, then dropped
+            for a single temperature-scaled protocol to keep the benchmark clean.</li>
+          <li><span class="r">leakage_audit.py</span> pHash overlap between the SSL corpus and
+            REAL-Colon query frames. Endoscopy-modality-specific; re-enable if REAL-Colon
+            returns.</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ================= PART 5 ================= -->
+<section class="part" id="p5">
+  <div class="part-head"><span class="n">PART 5</span>
+    <div><span class="eyebrow">Case study</span><h2>The <code>LR = 0</code> bug</h2></div></div>
+
+  <div class="prose">
+    <p>The first full-scale SSL job started on an A100 the morning of 2026-09-08. Watching its
+      TensorBoard scalars caught something the smoke tests could not: <strong>it was not
+      training at all.</strong></p>
+  </div>
+
+  <div class="callout bug">
+    <div class="lab">Symptom</div>
+    <p><code>lr</code> flat at <code>0.000e+00</code> at steps 49, 5349, 10649. <code>loss</code>
+      flat at <code>0.737</code> over 10,000+ steps. <code>loss/var</code> pinned at the variance-hinge
+      floor. Zero checkpoints in the run directory.</p>
+  </div>
+
+  <div class="prose">
+    <p><strong>Two independent bugs compounded:</strong></p>
+    <ol>
+      <li><strong><code>trainer.global_step</code> never advanced.</strong> <code>training_step</code>
+        called <code>opt.optimizer.step()</code> &mdash; the raw <code>AdamW.step()</code> &mdash;
+        instead of <code>opt.step()</code> (the Lightning optimizer). That bypass was a
+        workaround for an intermittent CPU hang on the login node, but on GPU it means Lightning's
+        step counter stays at 0. Consequences: <code>cosine_lr(global_step=0, &hellip;)</code>
+        sits at warmup-step-0, i.e. <strong>LR &equiv; 0</strong>, so every optimizer step is a
+        no-op; and <code>ModelCheckpoint(every_n_train_steps=500)</code> also keys off
+        <code>global_step</code>, so no <code>last.ckpt</code> was ever written &mdash; a
+        self-resubmit would have restarted from scratch, forever.</li>
+      <li><strong>The WebDataset epoch was 12&times; too long.</strong>
+        <code>.with_epoch(4687)</code> was applied to the per-worker pipeline, so with
+        <code>num_workers=12</code> a Lightning &ldquo;epoch&rdquo; was ~56,000 batches (~5 h).
+        The <em>other</em> checkpoint path, <code>on_train_epoch_end</code>, would not have fired
+        inside the 6-hour wall either.</li>
+    </ol>
+    <p>Together: the run could produce nothing usable and loop indefinitely.</p>
+  </div>
+
+  <div class="callout">
+    <div class="lab">Fix &mdash; commit ccb8985</div>
+    <p><strong>1.</strong> <code>opt.step()</code> on CUDA (raw bypass kept only for CPU smokes)
+      &rarr; <code>global_step</code> advances, schedules and checkpoint triggers work.</p>
+    <p><strong>2.</strong> <code>.with_epoch()</code> moved onto a <code>wds.WebLoader</code>
+      wrapping the <code>DataLoader</code>, applied <em>after</em> the worker fan-in &rarr;
+      exactly <code>steps_per_epoch</code> batches per epoch. Verified on the login node:
+      request 40, get 40, stable across epochs at <code>num_workers=4</code>.</p>
+  </div>
+
+  <div class="prose">
+    <p>The GPU smoke had passed because 4 steps at batch-size 2 is entirely inside LR warmup
+      &mdash; LR is ~0 there whether or not the counter moves, and the smoke only checks that a
+      checkpoint file appears and resume works, which the epoch-end path did handle. The bug
+      only shows up at scale, which is exactly why the run was being watched.</p>
+  </div>
+</section>
+
+<!-- ================= PART 6 ================= -->
+<section class="part" id="p6">
+  <div class="part-head"><span class="n">PART 6</span>
+    <div><span class="eyebrow">Timeline</span><h2>What is left</h2></div></div>
+
+  <div class="prose">
+    <p><strong>The experiment is complete.</strong> All 4 settings trained (3 clean epochs
+      each), evaluated on the leakage-mitigated split, aggregated into the table in
+      Part&nbsp;2, and logged to
+      <a href="https://wandb.ai/models-ludwig-maximilian-university-of-munich/vlf-zeiss" target="_blank" rel="noopener">Weights &amp; Biases</a>.
+      What actually happened along the way, in order:</p>
+    <ol>
+      <li><strong>The LR=0 bug</strong> (Part&nbsp;5) &mdash; caught before it silently wasted a
+        full training run.</li>
+      <li><strong>A degraded compute node</strong> (<code>lrz-hgx-h100-003</code>, 0.23&nbsp;it/s,
+        ~11&times; slow) timed out two SSL runs; the resubmit logic didn't survive a SLURM
+        <code>TIMEOUT</code> (it SIGKILLs before any cleanup code runs) &mdash; fixed with an
+        <code>EXIT</code> trap + <code>--signal=B:TERM@180</code>, and that node excluded.</li>
+      <li><strong>A resume-epoch-counting bug</strong> made one run train ~4 epochs instead of 3
+        &mdash; fixed (<code>max_steps=total_steps</code>) and the setting re-run clean.</li>
+      <li><strong>The home filesystem quota filled</strong> and SIGKILLed a checkpoint write
+        twice &mdash; outputs moved to project scratch, and finished runs now auto-delete their
+        resume checkpoints, keeping only the 0.33&nbsp;GB eval artefact.</li>
+      <li><strong>An oversized <code>--time</code> request</strong> on the final evaluation
+        sweep left it starved of scheduler backfill priority for 7 hours despite each job taking
+        under 5 minutes; trimming the resource request let all 6 jobs finish within 12 minutes.</li>
+      <li>Added per the user's request mid-run: <strong>W&amp;B logging</strong> (full
+        hyperparameters + curves + timing, one run per setting, backfilled for the runs that
+        predated it), a <strong>perceptual-hash cross-split leakage mitigation</strong>, and a
+        <strong>storage-monitoring script</strong> now logging to W&amp;B alongside the runs.</li>
+    </ol>
+    <p><strong>Optional follow-ups, not required for the result &mdash; status as of
+      2026-09-13:</strong></p>
+    <ul>
+      <li><strong>LeJEPA/ImageNet failure-mode investigation:</strong> 3 SSL variants queued
+        (lower base LR 5e-5, stronger LLRD 0.65, and both together) to test whether gentler
+        optimisation avoids the regression &mdash; <code>PENDING</code> in the SLURM queue,
+        scheduler priority backfill, not yet run.</li>
+      <li><strong><code>hkv_tract</code> ontology audit:</strong> done (above) &mdash; confirms
+        the flag is structural, not a leakage finding.</li>
+      <li><strong>Full 506-zip GastroNet backfill</strong> (446 zips remaining, for a larger SSL
+        corpus): attempted, <code>FAILED</code> &mdash; a corrupted/truncated zip around shard
+        #69 raises <code>zipfile.BadZipFile</code>, and <code>portal_to_wds.py</code> has no
+        retry/skip-corrupt-shard handling yet. Not fixed; the 60-shard / 581k-image tier used for
+        every result above is unaffected.</li>
+      <li><strong>Dead ingest EC2 teardown:</strong> confirmed done &mdash; checked the AWS
+        Console (EC2, eu-north-1) directly on 2026-09-13: zero running instances. The ingest box
+        never survived to begin with (it kept vanishing ~20&nbsp;minutes after boot, the
+        new-account restriction described above), so there was nothing left to destroy. Only
+        Terraform's local state file still references it, which is cosmetic &mdash; no
+        <code>apply</code> will run against this stack again.</li>
+    </ul>
+  </div>
+
+  <div class="prose">
+    <h4>2026-09-14 &mdash; LRZ storage incident: the LeJEPA/ImageNet sweep crash-looped for
+      2.5&nbsp;hours, still blocked</h4>
+    <p>The 3-variant sweep above (step 1 of this section) actually started, then hit a hard LRZ
+      storage quota and crash-looped: the SSL job's self-resubmit <code>EXIT</code> trap treats
+      &ldquo;a checkpoint exists&rdquo; as &ldquo;resume, don't give up&rdquo; &mdash; including
+      when the checkpoint <em>write itself</em> is what's failing. It resubmitted a fresh SLURM
+      job every ~3.5&nbsp;minutes from 07:45 to 10:06 (50+ attempts), and would not stop for a
+      plain <code>scancel</code> or even <code>scancel -s KILL</code> &mdash; this cluster has
+      <code>JobRequeue=1</code> set site-wide. It was only actually broken by renaming
+      <code>last.ckpt&nbsp;&rarr;&nbsp;last.ckpt.paused</code> in all 3 run directories so the
+      script's own resume-check found nothing to resume.</p>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>path</th><th>backend</th><th>used / soft / hard</th><th>status</th></tr></thead>
+        <tbody>
+          <tr><td class="mono-cell">/dss/dsshome1/04/ra82sat2</td><td>LRZ_DSS02</td>
+            <td class="num">38.2G / 100G / 133G</td><td style="color:var(--good)">healthy</td></tr>
+          <tr><td class="mono-cell">.../dssmcmlfs01/pr74ze-dss-0001/ra82sat2</td><td>LRZ_DSS06</td>
+            <td class="num">200G / 200G / 200G</td><td style="color:var(--bad)">stuck at hard cap</td></tr>
+        </tbody>
+        <caption>Two separate GPFS filesets, two separate backend servers. <code>OUT_ROOT</code>,
+          <code>GASTRONET_ROOT</code> and <code>hf_cache</code> all live on the broken one
+          (home was too small for the full pipeline, hence the earlier move off it).</caption>
+      </table>
+    </div>
+    <p><strong>Diagnosis:</strong> the quota manager for the project fileset (backend
+      <code>LRZ_DSS06.dss.lrz.de</code>) reports exactly 200/200&nbsp;GB used, zero grace, and
+      has not moved by even one byte across <em>two</em> real deletions &mdash; 95&nbsp;GB of
+      unrelated cached VLM/diffusion models (<code>Qwen3-VL-32B/8B</code>,
+      <code>llava-onevision-7b</code>) removed from a shared <code>hf_cache</code>, then a
+      leftover 4.4&nbsp;MB <code>real-colon-dataset</code> folder. A manual tally of every
+      directory owned under that fileset totals <strong>~108&nbsp;GB</strong>, not 200&nbsp;GB.
+      LRZ separately posted an unscheduled-maintenance notice for <strong>DSSFS06</strong>
+      dated 2026-09-14, matching the backend name exactly &mdash; consistent with a stuck
+      server-side quota accounting entry, not a real full disk. The notice has since
+      disappeared from the dashboard, but a live write test still fails identically
+      (<code>Disk quota exceeded</code>), so the underlying accounting has not actually
+      recovered yet as of this writing.</p>
+    <div class="callout bug">
+      <div class="lab">Currently blocked</div>
+      <p>The 3-variant LeJEPA/ImageNet sweep stays paused (checkpoints renamed, nothing will
+        auto-resubmit) until a write against <code>pr74ze-dss-0001</code> actually succeeds.
+        Resubmitting on the strength of the dashboard banner clearing, without verifying a real
+        write, would very likely reproduce the same multi-hour crash loop. Home
+        (<code>LRZ_DSS02</code>) is unaffected and healthy throughout &mdash; this is isolated to
+        the one project fileset.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Generated 2026-09-08, finalised 2026-09-12 · repo <code>VLF_Zeiss</code> · branch
+    <code>feat/calibration-eval-pipeline</code> · HEAD <code>65dd3d3</code> · 28 commits ·
+    <a href="https://wandb.ai/models-ludwig-maximilian-university-of-munich/vlf-zeiss" target="_blank" rel="noopener">W&amp;B project</a>.
+    Part&nbsp;2 carries the final 4/4 post-SSL delta table on the leakage-mitigated split.
+    Code line numbers in Part&nbsp;4 reference the source at <code>ccb8985</code>.
+  </div>
+</footer>
+
+
+
+</body></html>

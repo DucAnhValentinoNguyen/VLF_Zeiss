@@ -23,6 +23,7 @@ source lrz/job_env.sh
 OBJ="${OBJ:-lejepa}"; INIT="${INIT:-siglip2}"; STAGE="${STAGE:-full}"
 CORPUS="${CORPUS:-gastronet}"
 OUT_DIR="$OUT_ROOT/ssl/${OBJ}_${INIT}_${CORPUS}_${STAGE}"
+[ -n "${RUN_TAG:-}" ] && OUT_DIR="${OUT_DIR}__${RUN_TAG}"
 mkdir -p "$OUT_DIR"
 
 HANDLED=0
