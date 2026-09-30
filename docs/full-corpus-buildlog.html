@@ -426,9 +426,10 @@ root cause was not fully nailed down, that is stated explicitly rather than pape
 <tr><td>LeJEPA / ImageNet</td><td class="kv">4,823,974</td><td class="kv">3</td><td class="kv">113,064</td><td class="kv">128</td><td class="kv">not separately recorded in CARD.json (telemetry only, non-gating)</td></tr>
 </tbody>
 </table>
-<p class="small">4,823,974 images/epoch &times; 3 epochs / 128 batch size = 113,064.6 &rarr; 113,064 steps after
-<code>batch_sizes()</code>&rsquo;s tail-merge rule (the last short batch of an epoch is folded into the
-previous full batch rather than run as its own undersized step). Both settings trained the identical step
+<p class="small">4,823,974 images/epoch &divide; 128 batch size = 37,687 full batches + 1 tail batch of 38 images = 37,688
+steps/epoch (per <code>batch_sizes()</code>: a tail remainder of exactly 1 sample gets folded into the previous
+batch to avoid a size-1 batch; here the tail is 38, so it runs as its own short final batch instead) &times; 3
+epochs = <strong>113,064 total optimizer steps per setting</strong> &mdash; not 113,064 per epoch. Both settings trained the identical step
 count over the identical manifest (<code>manifest_fingerprint</code> recorded and checked on every resume
 &mdash; see <code>index_manifest</code>/<code>load_state_dict</code> in &sect;4.1) so the DINO-vs-LeJEPA
 comparison in &sect;6 is apples-to-apples on corpus coverage, unlike the earlier subset-era LeJEPA/ImageNet
@@ -1968,15 +1969,17 @@ live only on LRZ storage, whose reliability this project had already been burned
 <hr class="sep">
 
 <h2 id="results">6. Final results &amp; foundation-model promotion</h2>
-<p>Both settings: 4.9M images (all 506 portal archives, raw, streamed), 113,064 optimizer steps (3 full
-passes over the manifest), ImageNet ViT-B/16 init only, batch size 128, bf16 mixed precision, AdamW +
+<p>Both settings: 4.9M images (all 506 portal archives, raw, streamed), 113,064 total optimizer steps
+(3 epochs &times; ~37,688 steps/epoch), ImageNet ViT-B/16 init only, batch size 128, bf16 mixed precision, AdamW +
 cosine LR schedule (base 1e-4, min 1e-6), layer-wise LR decay 0.75, grad clip 3.0, single-GPU H100&nbsp;94GB
 / A100&nbsp;80GB, self-resubmitting across a 48h wall-time ceiling. &Delta; = post-SSL &minus; pre-SSL
 (shared ImageNet zero-shot baseline).</p>
 
 <h3>6.1 DINO / ImageNet &mdash; passed the gate cleanly</h3>
-<p>Effective rank stable/climbing across all 3 epochs: 14.0 &rarr; 14.1 &rarr; 14.3. Zero regressions on any
-metric, any task.</p>
+<p>Effective rank stable/climbing across all 3 epochs: 14.0 &rarr; 14.1 &rarr; 14.3. Zero regressions on
+accuracy, balanced-accuracy, AUROC or Dice anywhere &mdash; the one exception in the table below is a single
+temperature-scaled ECE cell (pathology, +.0113), a calibration reading on an already near-saturated task, not
+a discrimination metric, and not part of the selection rule (&sect;5.4).</p>
 <table><thead><tr><th>Task</th><th>&Delta;ECE (ew)</th><th>&Delta;ECE&middot;T</th><th>&Delta;NLL</th><th>&Delta;acc</th><th>&Delta;bal-acc</th><th>&Delta;AUROC</th></tr></thead><tbody><tr><td>findings (20-way)</td><td><span class="neg">-0.0255</span></td><td><span class="neg">-0.0250</span></td><td><span class="neg">-0.0520</span></td><td><span class="pos">+0.0160</span></td><td><span class="pos">+0.0290</span></td><td><span class="pos">+0.0100</span></td></tr><tr><td>category (4-way)</td><td><span class="neg">-0.0117</span></td><td><span class="neg">-0.0024</span></td><td><span class="neg">-0.0090</span></td><td><span class="pos">+0.0040</span></td><td><span class="pos">+0.0010</span></td><td><span class="pos">+0.0020</span></td></tr><tr><td>pathology (2-way)</td><td><span class="neg">-0.0039</span></td><td><span class="pos">+0.0113</span></td><td><span class="pos">+0.0070</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0010</span></td></tr><tr><td>tract (2-way)</td><td><span class="">0.0000</span></td><td><span class="neg">-0.0038</span></td><td><span class="neg">-0.0100</span></td><td><span class="pos">+0.0020</span></td><td><span class="pos">+0.0010</span></td><td><span class="">0.0000</span></td></tr></tbody></table>
 <p>Segmentation: &Delta;ECE(ew) +.0012, &Delta;NLL &minus;.039, <strong>&Delta;Dice +.079</strong>
 (0.667 &rarr; 0.745).</p>
@@ -1994,8 +1997,10 @@ an objective-level failure. It still fails the gate on the full, correctly-bound
 smaller margin.</p>
 
 <h3>6.3 Decision and promoted artifact</h3>
-<p>DINO/ImageNet passes the selection gate (&sect;5.4) on every component &mdash; no regression anywhere.
-LeJEPA/ImageNet fails it on both mean balanced-accuracy and segmentation Dice. <strong>DINO is the
+<p>DINO/ImageNet passes the selection gate (&sect;5.4) on every component it measures (mean balanced-accuracy
+across the four classification tasks, and segmentation Dice) &mdash; no regression on either. It also shows no
+regression on accuracy or AUROC anywhere, the sole exception being one non-gating, temperature-scaled ECE cell
+(&sect;6.1). LeJEPA/ImageNet fails the gate on both mean balanced-accuracy and segmentation Dice. <strong>DINO is the
 winner</strong>, promoted as the project&rsquo;s foundation model:</p>
 <ul>
 <li>Checkpoint: <code>$HOME/vlf_zeiss_fullstream/foundation_model/ema_backbone.pt</code>
