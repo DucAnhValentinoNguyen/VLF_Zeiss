@@ -1779,16 +1779,32 @@ bounded-failure-rate gate from the second design iteration was removed in
 <p>The DINO/ImageNet winning run&rsquo;s promotion record (<code>CARD.json</code>) states
 <strong>decode_failures = 0 across 13,383,770 decode attempts</strong> &mdash; a genuinely clean sweep of
 whatever the counter captured. But <code>3 epochs &times; 4,823,974 images/epoch = 14,471,922</code>
-theoretical decode attempts over a full run, and 13,383,770 is only about <strong>92.5%</strong> of that.
-I am flagging this discrepancy rather than hand-waving past it. The most plausible explanation, given how
-the counters work (<code>PortalStream</code>&rsquo;s docstring, &sect;4.1: the checkpointed
-<code>_committed</code> snapshot only advances inside <code>commit()</code>, itself only called after a
-successful optimizer step), is that the recorded figure reflects the last <em>committed</em> checkpoint
-state at promotion time, which can trail the true final in-memory count by up to one commit interval &mdash;
-but I could not verify that specific mechanism as the actual cause from the artifacts available (the
-resume/periodic checkpoints that would show the exact commit history are already deleted by
-<span class="commit">e7f9df3</span>&rsquo;s post-<code>DONE</code> cleanup, &sect;2/WS4). Presenting both
-numbers and the gap between them, not asserting a cause I can&rsquo;t back with evidence.</p>
+theoretical decode attempts over a full run, and 13,383,770 is only about <strong>92.5%</strong> of that
+&mdash; a gap of roughly 1.09M images&rsquo; worth of attempts.</p>
+<p><strong>Root cause, identified via git archaeology (not the checkpoints themselves, which are gone):</strong>
+<code>load_state_dict()</code> does <code>self.attempts = state.get('attempts', 0)</code> &mdash; if a resumed
+checkpoint&rsquo;s saved dict has no <code>'attempts'</code> key, the counter silently resets to 0 instead of
+erroring. That field was only added in <span class="commit">84a6d16</span>, committed
+<strong>2026-09-22 16:24:49</strong> (confirmed via <code>git show -s --format=%ci 84a6d16</code>); the
+docstring for <code>PortalStream</code> even says so: &ldquo;Older checkpoints (pre-2026-09-22) never recorded
+these.&rdquo; The DINO/ImageNet fullstream run&rsquo;s own job history spans <span class="commit">5795331</span>
+(started 2026-09-17) through <span class="commit">5812722</span> (completed 2026-09-29) &mdash; a 12-day,
+multi-resubmission span that starts <em>before</em> commit <code>84a6d16</code> existed. Worse, the
+corrupt-image-handling code itself was being actively redesigned in the middle of that exact window: three
+commits landed within about 48 hours &mdash; <span class="commit">84a6d16</span> (09-22 16:24),
+<span class="commit">26c315e</span> (09-24 15:54), and <span class="commit">3b7b3a4</span> (09-24 16:29) &mdash;
+and there were FAILED job attempts squarely inside that window
+(<span class="commit">5799991</span>/<span class="commit">5799992</span> on 09-21,
+<span class="commit">5801249</span>/<span class="commit">5802400</span> on 09-23/24, &sect;3.2), consistent
+with active debugging and redeploys mid-run. So whichever resume picked up code from <code>84a6d16</code> or
+later but loaded a checkpoint written by the <em>older</em> code would have had its <code>attempts</code>
+counter silently reset to 0 at that exact point &mdash; losing whatever had been counted before it, even
+though the actual training (model weights, optimizer state, step count) continued correctly and
+uninterrupted. The observed gap (~1.09M images, ~22.6% of one epoch) is consistent with exactly this: some
+early chunk of the run&rsquo;s decode attempts, from before the counter existed or across a stale-checkpoint
+resume, was never counted &mdash; not with any image actually being skipped or lost from training. I cannot
+pin the <em>exact</em> size of that blind spot (the checkpoints that would show it are deleted, &sect;2/WS4),
+but the mechanism is now identified with direct evidence (commit dates + job timeline), not speculation.</p>
 <p>I could not find an equivalent decode_failures/attempts figure recorded for the LeJEPA/ImageNet run
 specifically &mdash; <code>CARD.json</code>&rsquo;s <code>lejepa_imagenet_post</code> block has no such
 field, and LeJEPA&rsquo;s own <code>last.ckpt</code> (which would have carried the live counters) no longer
