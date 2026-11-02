@@ -105,7 +105,7 @@ python -m vlfz.ssl.pretrain --objective lejepa --init siglip2 --stage full --cor
 # gastronet_source defaults to local_webdataset: reads $GASTRONET_ROOT/webdataset/*.tar directly.
 ```
 
-Only 60 of 506 portal zips are ingested so far (581,518 images, ~8GB curated).
+Full-corpus runs use `gastronet_source: portal_zip` instead: the loader streams all 506 portal archives (4,823,974 images per epoch) directly from the portal without staging the corpus locally, with deterministic shuffling and a blank-sample fallback so step counts stay exact across SLURM restarts (3 epochs = 113,064 optimizer steps per setting). The local tier above holds only 60 of 506 portal zips (581,518 images, ~8GB curated).
 That's already enough: `ssl.subset_images` samples ~700k images for a short
 in-domain adaptation from a strong pretrained init, not pretraining from
 scratch — the current runs see ~1.7M image-presentations across 3 epochs. To
