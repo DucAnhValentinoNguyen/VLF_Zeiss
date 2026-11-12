@@ -9,10 +9,52 @@ local WebDataset tier on LRZ (see `pipeline/`).
 Independent repo — its own venv (`.venv`), its own code. No dependency on any
 sibling project.
 
+## Results and released checkpoint
+
+Two studies, same evaluation (weighted k-NN on HyperKvasir, de-duplicated split):
+
+1. **Full-corpus study (main result, 2026-09-29).** ImageNet ViT-B/16 init, then
+   SSL on **all 506 GastroNet-5M archives** (4,823,974 images/epoch, 3 epochs =
+   113,064 steps), `DINO` vs `LeJEPA`. Run with `lrz/submit_fullstream.sh`; the
+   loader streams the portal zips directly (`--source portal_zip`).
+2. **Curated-subset study (2026-09-08..13).** 4 settings, {DINO, LeJEPA} ×
+   {SigLIP-2, ImageNet}, on a 60-zip / 581k-image local WebDataset tier. Kept as an
+   earlier, smaller comparison.
+
+Full-corpus results, mean balanced accuracy over the 4 classification tasks and
+polyp-segmentation Dice (frozen ImageNet baseline → after SSL):
+
+| model | mean bal. acc. | Δ | hkv_seg Dice | Δ | gate |
+|---|---|---|---|---|---|
+| frozen ImageNet (baseline) | 0.8605 | – | 0.667 | – | – |
+| **DINO + ImageNet** | **0.8689** | +0.008 | **0.745** | +0.079 | pass |
+| LeJEPA + ImageNet | 0.8279 | −0.033 | 0.588 | −0.079 | fail (regresses) |
+
+The **DINO/ImageNet** model is the promoted foundation model: no regression on any
+task, effective rank stable (14.0 → 14.3, no collapse), 0 decode failures in
+13.4M decode attempts. `hkv_tract` is structurally easy (tract-exclusive labels),
+so its ~0.99 is a caveat, not a finding. Selection rule, per-task numbers and
+provenance are in `foundation_model/CARD.json` (on LRZ, under
+`$HOME/vlf_zeiss_fullstream/`) and in the W&B project
+`vlf-zeiss` (artifact `dino-imagenet-s506-raw-e3`).
+
+**Weights.** Private Hugging Face repo `DucAnhValentinoNguyen/vlf-zeiss-dino-imagenet`
+(`ema_backbone.pt`, ViT-B/16 trunk, 343 MB). The weights are trained on
+GastroNet-5M, which is under a data-use agreement: do not redistribute. Load:
+
+```python
+import torch, timm
+ck = torch.load("ema_backbone.pt", map_location="cpu", weights_only=False)
+m = timm.create_model("vit_base_patch16_224", num_classes=0, global_pool="")
+m.load_state_dict(ck["ema_backbone"])   # feature = LayerNorm(mean of patch tokens), 768-d
+```
+
 ## The experiment
 
-4 model settings = **{DINO v1, LeJEPA}** × **{SigLIP-2 ViT-B/16 init, ImageNet
-ViT-B/16 init}**.
+Original design: 4 model settings = **{DINO v1, LeJEPA}** × **{SigLIP-2 ViT-B/16
+init, ImageNet ViT-B/16 init}**. The full-corpus study above dropped SigLIP-2
+(it lost to ImageNet on every task before SSL); its code stays as dormant
+reference.
 
 1. Evaluate all 4 **zero-shot on HyperKvasir** (frozen init).
 2. **SSL-pretrain** each on GastroNet-5M (unlabeled): DINO v1 / LeJEPA, full
@@ -105,11 +147,13 @@ python -m vlfz.ssl.pretrain --objective lejepa --init siglip2 --stage full --cor
 # gastronet_source defaults to local_webdataset: reads $GASTRONET_ROOT/webdataset/*.tar directly.
 ```
 
-Only 60 of 506 portal zips are ingested so far (581,518 images, ~8GB curated).
-That's already enough: `ssl.subset_images` samples ~700k images for a short
-in-domain adaptation from a strong pretrained init, not pretraining from
-scratch — the current runs see ~1.7M image-presentations across 3 epochs. To
-ingest more anyway (e.g. for a larger SSL subset):
+Full-corpus runs use `--source portal_zip` instead: the loader streams all 506
+portal archives (4,823,974 images per epoch) directly from the portal without
+staging the corpus locally, with deterministic shuffling and a blank-sample
+fallback so step counts stay exact across SLURM restarts (3 epochs = 113,064
+optimizer steps per setting). The local tier above holds only 60 of 506 portal
+zips (581,518 images, ~8GB curated) and backs the curated-subset study
+(~1.7M image-presentations across 3 epochs). To ingest more locally:
 
 ```bash
 bash lrz/backfill_gastronet_full.sh   # resumes from pipeline/ingest's _ingested.txt, skips done shards
